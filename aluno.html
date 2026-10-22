@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aula de conversação</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="/shared.css">
+<style>
+  .wrap { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .brand { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .netbar { background: var(--call-bg); color: var(--call); border: 1px solid var(--call-line); border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
+  .card h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
+  .card h2 { font-size: 17px; font-weight: 600; }
+  .field label.lbl { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 5px; }
+  .join { max-width: 460px; margin: 4vh auto 0; width: 100%; }
+  .check { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .check video { width: 100%; max-width: 320px; aspect-ratio: 4 / 3; border-radius: 8px; background: #000; object-fit: cover; transform: scaleX(-1); }
+  .meter { height: 8px; width: 100%; max-width: 320px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--ok); transition: width 0.08s linear; }
+
+  .game { margin: 4px 0 14px; }
+  #game-canvas { display: block; width: 100%; max-width: 640px; aspect-ratio: 4 / 1; border: 1px solid var(--line); border-radius: 8px; touch-action: manipulation; cursor: pointer; }
+  .devrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; max-width: 640px; }
+  .devrow label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); min-width: 0; }
+  .devrow select { font: inherit; text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px; min-width: 0; width: 100%; }
+  .devs { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+  .devs summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  .devs .devrow { margin-top: 10px; }
+  @media (max-width: 560px) { .devrow { grid-template-columns: 1fr; } }
+  .live-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .live-top h1 { font-size: 22px; font-weight: 600; }
+  .timer { font-family: var(--font-mono); font-weight: 600; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 8px; }
+  .tiles .avatar { width: 52px; height: 52px; font-size: 18px; }
+  .tiles .tile .nm { font-size: 12px; }
+  .tiles .tile.me { --lvl: var(--primary); }
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .call-big { min-height: 64px; font-size: 19px; font-family: var(--font-display); width: 100%; }
+  .banner { border-radius: 8px; padding: 9px 12px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .banner.talk { background: var(--live-bg); color: var(--live); }
+  .banner.listen { background: var(--surface); border: 1px solid var(--line); }
+  .status { font-size: 13px; color: var(--ink-2); min-height: 18px; }
+  @media (max-width: 560px) {
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tiles .avatar { width: 40px; height: 40px; font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="brand">
+      <span class="eyebrow" id="title">Aula de conversação</span>
+    </header>
+    <div class="netbar" id="net" role="status" hidden>Conexão instável. Reconectando…</div>
+
+    <section id="screen"></section>
+
+    <section id="waiting" hidden>
+      <div class="card">
+        <p class="eyebrow" id="w-phase">Sala de espera</p>
+        <h1 id="w-head">Aguardando o professor iniciar a aula</h1>
+        <p id="w-sub"></p>
+        <p class="small" id="w-note"></p>
+        <div class="game" id="game">
+          <canvas id="game-canvas" aria-label="Joguinho: pule os lápis" role="img"></canvas>
+          <p class="small" id="game-score">Pontos: 0</p>
+        </div>
+        <div class="check">
+          <h2>Teste sua câmera e microfone</h2>
+          <div class="devrow" id="w-dev" hidden>
+            <label>Câmera <select id="w-cam"></select></label>
+            <label>Microfone <select id="w-mic"></select></label>
+          </div>
+          <video id="w-video" muted playsinline hidden></video>
+          <div class="meter" aria-hidden="true"><i id="w-meter"></i></div>
+          <p class="small" id="w-status">Faça o teste agora para não perder tempo quando a aula começar.</p>
+          <button class="btn" id="w-test" type="button">Testar câmera e microfone</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="live" hidden>
+      <div class="live-top">
+        <h1><span id="l-room">Sala</span> <span class="small" id="l-round"></span></h1>
+        <div class="timer" id="l-timer" aria-label="Tempo restante da rodada">--:--</div>
+      </div>
+      <div class="banner" id="l-banner" role="status" hidden></div>
+      <div class="msg err" id="l-warn" hidden>
+        <span id="l-warn-text"></span>
+        <button class="btn btn-sm" id="l-retry" type="button" hidden>Tentar de novo</button>
+      </div>
+      <div class="status" id="l-status" role="status"></div>
+      <div class="tiles" id="l-tiles"></div>
+      <div id="l-audio" hidden></div>
+      <details class="devs" id="l-devs" hidden>
+        <summary>Trocar câmera ou microfone</summary>
+        <div class="devrow">
+          <label>Câmera <select id="l-cam-sel"></select></label>
+          <label>Microfone <select id="l-mic-sel"></select></label>
+        </div>
+      </details>
+      <div class="controls">
+        <button class="btn" id="l-mic" type="button"></button>
+        <button class="btn" id="l-cam" type="button"></button>
+      </div>
+      <button class="btn btn-sm" id="l-sound" type="button" hidden>Ativar o som da sala</button>
+      <button class="btn btn-call call-big" id="l-call" type="button"></button>
+      <button class="btn btn-sm" id="l-cancel" type="button" hidden>Cancelar chamado</button>
+    </section>
+  </main>
+
+  <script src="/vendor/livekit-client.umd.js"></script>
+  <script src="/shared.js"></script>
+  <script src="/jogo.js"></script>
+  <script src="/aluno.js"></script>
+</body>
+</html>
