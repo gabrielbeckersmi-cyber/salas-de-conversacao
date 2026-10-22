@@ -54,6 +54,7 @@
       if (px + pw - 4 > o.x + 2 && px + 4 < o.x + o.w - 2 && py < o.h - 4) {
         st.over = true; st.overAtMs = performance.now();
         var sc = Math.floor(st.dist / 10);
+        if (window.Jogo && window.Jogo.onScore) window.Jogo.onScore(sc);
         if (sc > hi) { hi = sc; try { localStorage.setItem(HI_KEY, String(hi)); } catch (e) { /* ignorar */ } }
       }
     }

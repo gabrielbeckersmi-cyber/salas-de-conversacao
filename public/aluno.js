@@ -128,7 +128,22 @@
     showOnly('waiting');
     updateWaiting(running);
     window.Jogo.start();
+    renderRank();
   }
+
+  // ---------- ranking do joguinho ----------
+  function renderRank() {
+    var list = (snap && snap.ranking) || [];
+    var box = $('game-rank');
+    box.hidden = !list.length;
+    $('game-rank-list').innerHTML = list.map(function (r) {
+      return '<li' + (snap.me && r.pid === snap.me.pid ? ' class="me"' : '') + '><span class="rn">' + A.esc(r.name) + '</span><span class="rs">' + r.score + '</span></li>';
+    }).join('');
+  }
+  window.Jogo.onScore = function (score) {
+    if (!session || !score) return;
+    A.api('POST', '/api/classes/' + encodeURIComponent(classId) + '/score', { studentId: session.studentId, score: score }).catch(function () { /* ignorar */ });
+  };
 
   // ---------- sala de espera ----------
   function updateWaiting(running) {

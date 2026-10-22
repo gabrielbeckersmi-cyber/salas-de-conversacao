@@ -208,6 +208,15 @@ function build(env) {
     res.json({ studentId: s.id, pid: s.pid, name: s.name, level: s.level });
   });
 
+  app.post('/api/classes/:id/score', function (req, res) {
+    const c = getClass(req.params.id);
+    const s = c.students[String(req.body.studentId)];
+    if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.');
+    const best = C.submitScore(c, s, req.body.score);
+    schedule(c);
+    res.json({ best: best });
+  });
+
   app.post('/api/classes/:id/call', function (req, res) {
     const c = getClass(req.params.id);
     const s = c.students[String(req.body.studentId)];
