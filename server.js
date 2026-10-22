@@ -199,7 +199,7 @@ function build(env) {
   // --- aluno ---
   app.get('/api/classes/:id/public', function (req, res) {
     const c = getClass(req.params.id);
-    res.json({ title: c.title, phase: c.phase });
+    res.json({ title: c.title, phase: c.phase, endMessage: c.phase === 'done' ? (c.endMessage || null) : null });
   });
 
   app.post('/api/classes/:id/join', function (req, res) {
@@ -207,6 +207,47 @@ function build(env) {
     const s = C.joinStudent(c, { name: req.body.name, level: req.body.level, resumeId: req.body.resumeId });
     schedule(c);
     res.json({ studentId: s.id, pid: s.pid, name: s.name, level: s.level });
+  });
+
+  function chatTargets(c, roomId) {
+    const r = reg(c.id);
+    const out = [];
+    const room = c.rooms.find(function (x) { return x.id === roomId; });
+    if (room) room.members.forEach(function (pid) {
+      const st = C.byPid(c, pid);
+      const set = st && r.students.get(st.id);
+      if (set) set.forEach(function (ws) { out.push(ws); });
+    });
+    r.teachers.forEach(function (ws) { out.push(ws); });
+    return out;
+  }
+  function sendChat(c, roomId, msg) {
+    chatTargets(c, roomId).forEach(function (ws) { send(ws, { type: 'chat', roomId: roomId, msg: msg }); });
+    save();
+  }
+
+  app.post('/api/classes/:id/chat', function (req, res) {
+    const c = getClass(req.params.id);
+    const s = c.students[String(req.body.studentId)];
+    if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.');
+    const r = C.studentSay(c, s, req.body.text);
+    sendChat(c, r.roomId, r.msg);
+    res.json({ ok: true });
+  });
+
+  app.get('/api/classes/:id/chat', function (req, res) {
+    const c = getClass(req.params.id);
+    const s = c.students[String(req.query.studentId)];
+    if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.');
+    const room = C.isLive(c) ? C.roomOf(c, s.pid) : null;
+    res.json({ roomId: room ? room.id : null, messages: room ? C.chatHistory(c, room.id) : [] });
+  });
+
+  app.get('/api/professor/classes/:id/chat', needTeacher, function (req, res) {
+    const c = getClass(req.params.id);
+    const rooms = {};
+    c.rooms.forEach(function (r) { rooms[r.id] = C.chatHistory(c, r.id); });
+    res.json({ rooms: rooms });
   });
 
   app.post('/api/classes/:id/score', function (req, res) {
@@ -270,6 +311,9 @@ function build(env) {
       case 'end-class': C.endClass(c); armTimer(c); break;
       case 'hear': C.setHear(c, b.roomId, b.mode); break;
       case 'answer': C.answerCall(c, b.roomId); break;
+      case 'bmic': C.setBroadcastMic(c, b.roomIds); break;
+      case 'end-message': C.setEndMessage(c, b); break;
+      case 'chat': C.teacherSay(c, b.roomIds, b.text).forEach(function (x) { sendChat(c, x.roomId, x.msg); }); break;
       case 'kick': { const s = C.kick(c, b.pid); disconnectStudent(c, s.id); break; }
       default: throw new C.AppError(400, 'action', 'Ação desconhecida.');
     }

@@ -126,5 +126,6 @@
     if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); jump(); }
   });
   document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); else if (canvas.offsetParent !== null) start(); });
+  document.addEventListener('themechange', function () { colors(); });
   window.Jogo = { start: start, stop: stop };
 })();

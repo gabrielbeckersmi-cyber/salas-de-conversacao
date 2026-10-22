@@ -12,6 +12,19 @@ Aulas de conversação com salas de 3–4 alunos separadas por nível (Básico /
 
 Use fones de ouvido ao ouvir/falar com uma sala, para evitar eco.
 
+### Recursos durante a aula
+- **Tema claro/escuro:** botão redondo no canto superior direito (professor e aluno). A escolha fica salva no navegador.
+- **Chat por sala:** cada sala tem seu chat. Mensagens do professor aparecem em faixa escura com a etiqueta "PROFESSOR", e nomes que imitam o professor (Professor, Prof..., Admin) são recusados na entrada. No painel, o botão **Chat** de cada sala abre uma janela flutuante, com um contador de mensagens novas.
+- **Transmissão:** marque as salas na caixinha no topo de cada uma (ou use Todas/Nenhuma). Daí você pode **ligar o microfone** para todas ou só as selecionadas, **compartilhar a tela** para todas ou só as selecionadas, e **enviar mensagem** às selecionadas ou a todas. Os alunos veem a tela em destaque, com botão de tela cheia.
+- **Mensagem final:** no fim do painel, "Mensagem exibida aos alunos ao encerrar a aula": texto, link e o texto do botão. Vazio = mensagem padrão.
+
+### Custos e limites da transmissão
+- Microfone e tela conectam você às salas escolhidas, e isso consome minutos de participante no LiveKit enquanto estiver ligado.
+- A tela é enviada separadamente para cada sala. Com muitas salas, é preciso mais internet de envio (o sistema reduz a qualidade automaticamente: cerca de 4 Mbps no total).
+- O chat guarda as últimas 150 mensagens de cada sala e é apagado quando a rodada seguinte começa.
+
+
+
 ## 1) Conta no LiveKit Cloud
 Crie uma conta em https://cloud.livekit.io, crie um projeto e copie **URL** (`wss://...livekit.cloud`), **API Key** e **API Secret**. O plano gratuito serve para testar; para uso regular (≈ 25–30 alunos várias vezes por semana) provavelmente será preciso um plano pago — confira os preços atuais no site.
 

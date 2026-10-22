@@ -17,7 +17,15 @@
   var offset = 0;          // diferença entre o relógio do servidor e o deste computador
   var ws = null;
   var views = new Map();   // roomId -> RoomView (uma conexão LiveKit por sala)
-  var ui = { n: null, confirm: null, warn: '', net: false, watch: new Set() };
+  var ui = {
+    n: null, confirm: null, warn: '', net: false, watch: new Set(),
+    sel: new Set(),          // salas escolhidas para transmissão (microfone, tela, mensagem)
+    share: null,             // { stream, rooms:Set } quando a tela está sendo compartilhada
+    chat: {},                // roomId -> mensagens
+    unread: {},              // roomId -> não lidas
+    chatRoom: null,          // sala aberta no chat
+    round: -1, fetched: -1, emInit: false, keep: null
+  };
 
   function T(method, url, body) {
     return A.api(method, url, body, token).catch(function (e) {
@@ -97,9 +105,10 @@
   function viewPanel() {
     app.innerHTML = '<p class="small">Conectando à aula…</p>';
     ws = A.connectWS('/ws?role=teacher&class=' + encodeURIComponent(classId) + '&token=' + encodeURIComponent(token), {
-      onOpen: function () { clearTimeout(netTimer); if (ui.net) { ui.net = false; render(); } },
+      onOpen: function () { clearTimeout(netTimer); ui.fetched = -1; if (S) fetchChat(); if (ui.net) { ui.net = false; render(); } },
       onMessage: function (m) {
         if (m.type === 'state') { S = m.data; offset = S.now - Date.now(); onState(); }
+        else if (m.type === 'chat') addChatMsg(m.roomId, m.msg);
       },
       onClose: function (e) {
         if (e.code === 4001) logout('Sessão expirada. Entre de novo.');
@@ -110,9 +119,18 @@
   }
 
   function onState() {
+    if (S.round !== ui.round) {                     // nova rodada: salas novas, chat novo
+      ui.round = S.round; ui.chat = {}; ui.unread = {}; ui.chatRoom = null; ui.sel.clear(); ui.fetched = -1;
+    }
+    if (!isLive()) { if (ui.share) stopShareQuiet(); ui.chatRoom = null; ui.sel.clear(); }
+    var ids = new Set(S.rooms.map(function (r) { return r.id; }));
+    ui.sel.forEach(function (id) { if (!ids.has(id)) ui.sel.delete(id); });
+    if (ui.share) { ui.share.rooms.forEach(function (id) { if (!ids.has(id)) ui.share.rooms.delete(id); }); if (!ui.share.rooms.size) stopShareQuiet(); }
     syncViews();
     applyHear();
     render();
+    if (isLive() && ui.fetched !== S.round) fetchChat();
+    ensureEm();
   }
 
   // ---------- conexões LiveKit (uma por sala; o professor só publica áudio na sala escolhida) ----------
@@ -149,6 +167,8 @@
       this.listening = false;
       this.talking = false;
       this.watching = false;
+      this.shareStream = null;
+      this.shareTrack = null;
       this.videos = new Map();
       this.videoOn = new Set();
       this.videoOff = new Set();
@@ -187,7 +207,9 @@
         room.remoteParticipants.forEach(function (p) {
           p.trackPublications.forEach(function (pub) { self.onPub(pub, p); });
         });
+        self.shareTrack = null;
         if (self.talking) self.setTalking(true);
+        if (self.shareStream) self.setShare(self.shareStream);
       }, function () {
         if (self.dead) return;
         clearTimeout(self.rt);
@@ -271,6 +293,27 @@
         if (on) { ui.warn = 'Não consegui usar o microfone. Libere a permissão do navegador (cadeado ao lado do endereço) e tente de novo.'; render(); }
       });
     }
+    setShare(stream) {
+      var self = this;
+      this.shareStream = stream;
+      this.chain = this.chain.then(async function () {
+        if (!self.connected) return;
+        var lp = self.room.localParticipant;
+        if (self.shareTrack) {
+          var old = self.shareTrack; self.shareTrack = null;
+          try { await lp.unpublishTrack(old, true); } catch (e) { /* ignorar */ }
+        }
+        var src = self.shareStream && self.shareStream.getVideoTracks()[0];
+        if (!src || src.readyState === 'ended') return;
+        var n = ui.share ? Math.max(1, ui.share.rooms.size) : 1;
+        var bps = Math.round(Math.min(1500000, Math.max(350000, 4000000 / n)));
+        var lt = new LK.LocalVideoTrack(src.clone(), undefined, true);
+        await lp.publishTrack(lt, { source: LK.Track.Source.ScreenShare, name: 'tela', simulcast: false, videoEncoding: { maxBitrate: bps, maxFramerate: 10 } });
+        self.shareTrack = lt;
+      }).catch(function () {
+        ui.warn = 'Não consegui enviar a tela para a sala. Tente parar e compartilhar de novo.'; render();
+      });
+    }
     destroy() {
       this.dead = true;
       clearTimeout(this.rt);
@@ -289,8 +332,9 @@
     var want = new Map();
     if (!live) ui.watch.clear();
     // Só conecta nas salas que você está vendo ou ouvindo: sem conexão, sem consumo de minutos.
+    var bm = new Set(S.bmic || []);
     if (live) S.rooms.forEach(function (r) {
-      if (r.lk && (ui.watch.has(r.id) || (S.hear && S.hear.roomId === r.id))) want.set(r.id, r);
+      if (r.lk && (ui.watch.has(r.id) || (S.hear && S.hear.roomId === r.id) || bm.has(r.id) || (ui.share && ui.share.rooms.has(r.id)))) want.set(r.id, r);
     });
     views.forEach(function (v, id) {
       var r = want.get(id);
@@ -300,13 +344,16 @@
   }
   function applyHear() {
     var h = S && S.hear;
+    var bm = new Set((S && S.bmic) || []);
     views.forEach(function (v, id) {
       var w = ui.watch.has(id);
       if (v.watching !== w) v.setWatching(w);
       var l = !!h && h.roomId === id;
       if (v.listening !== l) v.setListening(l);
-      var t = l && h.mode === 'talk';
+      var t = (l && h.mode === 'talk') || bm.has(id);
       if (v.talking !== t) v.setTalking(t);
+      var sh = ui.share && ui.share.rooms.has(id) ? ui.share.stream : null;
+      if (v.shareStream !== sh) v.setShare(sh);
     });
   }
   function startAudioAll() {
@@ -386,25 +433,30 @@
     var calling = members.some(function (s) { return s.callAt; });
     var listening = !!S.hear && S.hear.roomId === r.id;
     var talking = listening && S.hear.mode === 'talk';
+    var bcast = (S.bmic || []).indexOf(r.id) !== -1;
+    var sharing = !!ui.share && ui.share.rooms.has(r.id);
     var body;
     if (live) body = members.length ? '<div class="tiles">' + members.map(function (s) { return tileHTML(r, s); }).join('') + '</div>' : '<p class="empty">Sala vazia. Arraste alguém para cá.</p>';
     else body = '<div class="plist">' + (members.length ? members.map(function (s) { return chipHTML(s, r.id); }).join('') : '<span class="empty">Sala vazia. Arraste alguém para cá.</span>') + '</div>';
     var status = '';
     var actions = '';
     if (live) {
-      if (talking) status = '<span class="tag live"><i class="pulse"></i>Seu microfone está aberto</span>';
+      if (talking || bcast) status = '<span class="tag live"><i class="pulse"></i>Seu microfone está aberto</span>';
       else if (calling) status = '<span class="tag call"><i class="pulse"></i>Chamando professor</span>';
       else if (listening) status = '<span class="tag hear"><span class="eq"><i></i><i></i><i></i></span>Ouvindo a sala</span>';
       else status = '<span>Sem áudio</span>';
+      if (sharing) status += '<span class="tag share">' + A.ICON.screen + 'Tela compartilhada</span>';
+      var un = ui.unread[r.id] || 0;
       actions = '<div class="room-actions">' +
         '<button class="btn wide" data-act="watch" data-room="' + r.id + '" aria-pressed="' + ui.watch.has(r.id) + '" type="button">' + A.ICON.cam + (ui.watch.has(r.id) ? 'Parar de ver vídeo' : 'Ver vídeo') + '</button>' +
         '<button class="btn" data-act="listen" data-room="' + r.id + '" aria-pressed="' + listening + '" type="button">' + A.ICON.head + 'Ouvir</button>' +
-        '<button class="btn btn-live" data-act="talk" data-room="' + r.id + '" aria-pressed="' + talking + '" type="button">' + A.ICON.mic + (talking ? 'Falando' : 'Falar') + '</button></div>';
+        '<button class="btn btn-live" data-act="talk" data-room="' + r.id + '" aria-pressed="' + talking + '" type="button">' + A.ICON.mic + (talking ? 'Falando' : 'Falar') + '</button>' +
+        '<button class="btn wide" data-act="chat-open" data-room="' + r.id + '" aria-pressed="' + (ui.chatRoom === r.id) + '" type="button">' + A.ICON.chat + 'Chat' + (un ? ' <span class="unread">' + un + '</span>' : '') + '</button></div>';
     } else if (!members.length) {
       actions = '<div class="room-actions"><button class="btn btn-sm wide" data-act="remove-room" data-room="' + r.id + '" type="button">Remover sala vazia</button></div>';
     }
     return '<article class="room ' + (lvl ? A.LEVEL_CLS[lvl] : '') + (calling ? ' calling' : '') + (listening ? ' hearing' : '') + '" data-drop="' + r.id + '">' +
-      '<div class="room-head"><h3>Sala ' + r.no + '</h3><span class="badge">' + (lvl ? A.LEVEL_NAME[lvl] : 'Vazia') + ' · ' + members.length + '</span></div>' +
+      '<div class="room-head"><h3>' + (live ? '<label class="selbox" title="Incluir esta sala na transmissão"><input type="checkbox" data-sel="' + r.id + '"' + (ui.sel.has(r.id) ? ' checked' : '') + ' aria-label="Selecionar a sala ' + r.no + ' para transmissão"></label>' : '') + 'Sala ' + r.no + '</h3><span class="badge">' + (lvl ? A.LEVEL_NAME[lvl] : 'Vazia') + ' · ' + members.length + '</span></div>' +
       body + (status ? '<div class="room-status">' + status + '</div>' : '') + actions + '</article>';
   }
 
@@ -421,6 +473,8 @@
 
   function render() {
     if (!S) return;
+    var fa = document.activeElement;
+    ui.keep = fa && /^(bc-text|em-text|em-url|em-label|dock-in)$/.test(fa.id) ? { id: fa.id, s: fa.selectionStart, e: fa.selectionEnd } : null;
     var by = {};
     S.students.forEach(function (s) { by[s.pid] = s; });
     var assigned = new Set();
@@ -451,7 +505,7 @@
     if (ui.confirm) h += '<div class="confirm" role="alert"><p>' + esc(confirmText()) + '</p><button class="btn btn-primary" data-act="confirm-yes" type="button">Confirmar</button><button class="btn" data-act="confirm-no" type="button">Cancelar</button></div>';
 
     if (S.phase === 'done') {
-      h += '<div class="card"><h2>Aula encerrada</h2><p>' + S.students.length + ' aluno' + (S.students.length === 1 ? '' : 's') + ' participaram. Você pode criar uma nova aula na lista.</p><div><a class="btn btn-primary" href="/professor">Voltar às aulas</a></div></div>';
+      h += '<div class="card"><h2>Aula encerrada</h2><p>' + S.students.length + ' aluno' + (S.students.length === 1 ? '' : 's') + ' participaram. Você pode criar uma nova aula na lista.</p><div><a class="btn btn-primary" href="/professor">Voltar às aulas</a></div></div><div id="em-slot"></div>';
       app.innerHTML = h;
       postRender();
       return;
@@ -485,12 +539,14 @@
       h += '<p class="hint">As salas começam só com as iniciais. “Ver vídeo” mostra o vídeo da sala escolhida (e passa a consumir dados do LiveKit só dela). “Ouvir” liga o áudio só da sala escolhida. “Falar” abre o seu microfone só para ela. Use fones de ouvido para evitar eco.</p>';
     }
 
+    if (live) h += '<div id="bc-slot"></div>';
     h += '<div class="board">';
     if (planning || unassigned.length) {
       h += '<section class="zone bucket" data-drop="none"><h3>Sem sala <span class="badge lv-misto">' + unassigned.length + '</span></h3><div class="plist">' +
         (unassigned.length ? unassigned.map(function (s) { return chipHTML(s, null); }).join('') : '<span class="empty">Todos os alunos estão em salas. Arraste um aluno para cá para tirá-lo de uma sala.</span>') + '</div></section>';
     }
     h += S.rooms.map(function (r) { return roomHTML(r, by); }).join('') + '</div>';
+    h += '<div id="em-slot"></div>';
 
     app.innerHTML = h;
     postRender();
@@ -501,7 +557,177 @@
       v.videos.forEach(function (_el, pid) { mountVideo(v, pid); });
       paintAll(v);
     });
+    var bslot = $('bc-slot');
+    if (bslot) { ensureBc(); renderBcTop(); bslot.appendChild(bcEl); }
+    var eslot = $('em-slot');
+    if (eslot) { ensureEm(); eslot.appendChild(emEl); }
+    if (ui.keep) {
+      var k = $(ui.keep.id);
+      if (k) { try { k.focus({ preventScroll: true }); if (k.setSelectionRange && ui.keep.s != null) k.setSelectionRange(ui.keep.s, ui.keep.e); } catch (e) { /* ignorar */ } }
+      ui.keep = null;
+    }
     tick();
+  }
+
+  // ---------- painel de transmissão (selecionar salas, microfone, tela, mensagem) ----------
+  var bcEl = null;
+  function ensureBc() {
+    if (bcEl) return;
+    bcEl = document.createElement('section');
+    bcEl.className = 'bcast';
+    bcEl.innerHTML = '<div id="bc-top"></div>' +
+      '<form id="bc-form" class="bc-form" autocomplete="off"><input class="input" id="bc-text" maxlength="300" placeholder="Mensagem do professor para as salas…" aria-label="Mensagem do professor">' +
+      '<button class="btn btn-primary" type="submit" data-send="sel" id="bc-send-sel">Enviar às selecionadas</button>' +
+      '<button class="btn" type="button" data-act="bc-send-all">Enviar a todas</button></form>';
+    bcEl.querySelector('#bc-form').addEventListener('submit', function (e) { e.preventDefault(); sendBroadcast('sel'); });
+  }
+  function renderBcTop() {
+    if (!bcEl || !S) return;
+    var n = ui.sel.size;
+    var total = S.rooms.length;
+    var mic = (S.bmic || []).length;
+    var sh = ui.share ? ui.share.rooms.size : 0;
+    var h = '<div class="bc-head"><b>Transmissão do professor</b><span class="small">' + n + ' de ' + total + ' sala' + (total === 1 ? '' : 's') + ' selecionada' + (n === 1 ? '' : 's') + '</span>' +
+      '<button class="btn btn-sm" data-act="sel-all" type="button">Todas</button><button class="btn btn-sm" data-act="sel-none" type="button">Nenhuma</button></div>' +
+      '<div class="bc-actions"><div class="bc-group"><span class="lbl-t">Microfone</span>';
+    if (mic) h += '<button class="btn btn-live" aria-pressed="true" data-act="bmic-off" type="button">' + A.ICON.mic + 'Desligar (' + mic + ' sala' + (mic === 1 ? '' : 's') + ')</button>';
+    else h += '<button class="btn" data-act="bmic-all" type="button">' + A.ICON.mic + 'Todas as salas</button><button class="btn"' + (n ? '' : ' disabled') + ' data-act="bmic-sel" type="button">' + A.ICON.mic + 'Selecionadas</button>';
+    h += '</div><div class="bc-group"><span class="lbl-t">Tela</span>';
+    if (sh) h += '<button class="btn btn-live" aria-pressed="true" data-act="share-stop" type="button">' + A.ICON.screen + 'Parar (' + sh + ' sala' + (sh === 1 ? '' : 's') + ')</button>';
+    else h += '<button class="btn" data-act="share-all" type="button">' + A.ICON.screen + 'Todas as salas</button><button class="btn"' + (n ? '' : ' disabled') + ' data-act="share-sel" type="button">' + A.ICON.screen + 'Selecionadas</button>';
+    h += '</div></div><p class="hint">Marque as salas pela caixinha no topo de cada uma. Falar e compartilhar a tela conectam você às salas escolhidas e consomem minutos do LiveKit enquanto estiver ligado. Para a tela, quanto mais salas, mais internet de envio é preciso.</p>';
+    bcEl.querySelector('#bc-top').innerHTML = h;
+    bcEl.querySelector('#bc-send-sel').disabled = !n;
+  }
+  function selectedIds() { return S.rooms.map(function (r) { return r.id; }).filter(function (id) { return ui.sel.has(id); }); }
+  function sendBroadcast(mode) {
+    var inp = bcEl.querySelector('#bc-text');
+    var text = inp.value.trim();
+    if (!text) return;
+    var ids = mode === 'all' ? 'all' : selectedIds();
+    if (mode !== 'all' && !ids.length) return;
+    inp.value = '';
+    act({ action: 'chat', roomIds: ids, text: text });
+  }
+  function startShare(ids) {
+    if (!ids.length) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      ui.warn = 'Este navegador não permite compartilhar a tela. Use o Chrome ou o Edge no computador.'; render(); return;
+    }
+    navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 10, max: 15 }, width: { max: 1600 }, height: { max: 900 } }, audio: false }).then(function (stream) {
+      var track = stream.getVideoTracks()[0];
+      ui.share = { stream: stream, rooms: new Set(ids) };
+      track.addEventListener('ended', function () { if (ui.share && ui.share.stream === stream) stopShare(); });
+      syncViews(); applyHear(); render();
+    }, function (e) {
+      if (e && e.name !== 'NotAllowedError') { ui.warn = 'Não consegui compartilhar a tela.'; render(); }
+    });
+  }
+  function stopShareQuiet() {
+    if (!ui.share) return;
+    var st = ui.share.stream;
+    ui.share = null;
+    applyHear();
+    try { st.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { /* ignorar */ }
+    syncViews();
+  }
+  function stopShare() { stopShareQuiet(); render(); }
+  function setBmic(ids) {
+    S.bmic = ids;
+    startAudioAll();
+    syncViews(); applyHear(); render();
+    act({ action: 'bmic', roomIds: ids });
+  }
+
+  // ---------- chat (painel flutuante) ----------
+  var dockEl = null;
+  function ensureDock() {
+    if (dockEl) return;
+    dockEl = document.createElement('div');
+    dockEl.className = 'dock';
+    dockEl.hidden = true;
+    dockEl.innerHTML = '<div class="dock-head"><b id="dock-title">Chat</b><button class="btn btn-sm" data-act="chat-close" type="button" aria-label="Fechar o chat">&times;</button></div>' +
+      '<div class="chat-list" id="dock-list" role="log" aria-live="polite"></div>' +
+      '<form class="chat-form" id="dock-form" autocomplete="off"><input class="input" id="dock-in" maxlength="300" placeholder="Mensagem do professor para esta sala…" aria-label="Mensagem para a sala"><button class="btn btn-primary" type="submit">Enviar</button></form>';
+    document.body.appendChild(dockEl);
+    dockEl.querySelector('#dock-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var inp = $('dock-in');
+      var text = inp.value.trim();
+      if (!text || !ui.chatRoom) return;
+      inp.value = '';
+      act({ action: 'chat', roomIds: [ui.chatRoom], text: text });
+    });
+  }
+  function chatMsgHTML(m) {
+    if (m.from === 'professor') return '<div class="cm prof"><span class="who">Professor</span>' + esc(m.text) + '</div>';
+    return '<div class="cm"><span class="who">' + esc(m.name) + '</span>' + esc(m.text) + '</div>';
+  }
+  function renderDock(stick) {
+    ensureDock();
+    if (!ui.chatRoom || !S || !isLive()) { dockEl.hidden = true; return; }
+    var r = S.rooms.find(function (x) { return x.id === ui.chatRoom; });
+    if (!r) { dockEl.hidden = true; ui.chatRoom = null; return; }
+    dockEl.hidden = false;
+    $('dock-title').textContent = 'Chat · Sala ' + r.no;
+    var list = ui.chat[ui.chatRoom] || [];
+    var el = $('dock-list');
+    var near = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    el.innerHTML = list.length ? list.map(chatMsgHTML).join('') : '<p class="none">Nenhuma mensagem ainda.</p>';
+    if (stick || near) el.scrollTop = el.scrollHeight;
+  }
+  function addChatMsg(roomId, m) {
+    var list = ui.chat[roomId] || (ui.chat[roomId] = []);
+    if (list.some(function (x) { return x.id === m.id; })) return;
+    list.push(m);
+    if (ui.chatRoom === roomId) renderDock(false);
+    else if (m.from !== 'professor') { ui.unread[roomId] = (ui.unread[roomId] || 0) + 1; if (S) render(); }
+  }
+  function fetchChat() {
+    if (!S || !isLive()) return;
+    var round = S.round;
+    T('GET', '/api/professor/classes/' + classId + '/chat').then(function (r) {
+      if (S.round !== round) return;
+      ui.fetched = round;
+      Object.keys(r.rooms).forEach(function (id) {
+        var cur = ui.chat[id] || [];
+        var have = new Set(cur.map(function (x) { return x.id; }));
+        r.rooms[id].forEach(function (m) { if (!have.has(m.id)) cur.push(m); });
+        cur.sort(function (a, b) { return a.id - b.id; });
+        ui.chat[id] = cur;
+      });
+      renderDock(true);
+    }, function () { /* ignorar */ });
+  }
+
+  // ---------- mensagem final da aula ----------
+  var emEl = null;
+  function ensureEm() {
+    if (!emEl) {
+      emEl = document.createElement('details');
+      emEl.className = 'em';
+      emEl.innerHTML = '<summary>Mensagem exibida aos alunos ao encerrar a aula</summary><div class="em-body">' +
+        '<label class="lbl-t" for="em-text">Mensagem</label><textarea class="input" id="em-text" maxlength="600" rows="3" placeholder="Obrigado por participar! Até a próxima."></textarea>' +
+        '<label class="lbl-t" for="em-url">Link (opcional)</label><input class="input" id="em-url" maxlength="500" inputmode="url" placeholder="https://seusite.com.br/pagina">' +
+        '<label class="lbl-t" for="em-label">Texto do botão do link</label><input class="input" id="em-label" maxlength="40" placeholder="Abrir link">' +
+        '<div class="em-actions"><button class="btn btn-primary" data-act="em-save" type="button">Salvar mensagem</button><button class="btn" data-act="em-reset" type="button">Voltar ao padrão</button><span class="small" id="em-status" role="status"></span></div></div>';
+    }
+    if (S && !ui.emInit) {
+      ui.emInit = true;
+      var em = S.endMessage || {};
+      emEl.querySelector('#em-text').value = em.text || '';
+      emEl.querySelector('#em-url').value = em.url || '';
+      emEl.querySelector('#em-label').value = em.label || '';
+    }
+  }
+  function saveEm(reset) {
+    if (reset) { emEl.querySelector('#em-text').value = ''; emEl.querySelector('#em-url').value = ''; emEl.querySelector('#em-label').value = ''; }
+    var st = emEl.querySelector('#em-status');
+    st.textContent = 'Salvando…';
+    T('POST', '/api/professor/classes/' + classId + '/act', { action: 'end-message', text: emEl.querySelector('#em-text').value, url: emEl.querySelector('#em-url').value, label: emEl.querySelector('#em-label').value }).then(function () {
+      st.textContent = reset ? 'Voltou ao padrão.' : 'Salvo.';
+      setTimeout(function () { if (st.textContent === 'Salvo.' || st.textContent === 'Voltou ao padrão.') st.textContent = ''; }, 2500);
+    }, function (e) { st.textContent = e.message; });
   }
 
   function tick() {
@@ -560,6 +786,19 @@
     if (a === 'add-room') { act({ action: 'add-room' }); return; }
     if (a === 'remove-room') { act({ action: 'remove-room', roomId: room }); return; }
     if (a === 'kick') { act({ action: 'kick', pid: el.getAttribute('data-pid') }); return; }
+    if (a === 'sel-all') { S.rooms.forEach(function (r) { ui.sel.add(r.id); }); render(); return; }
+    if (a === 'sel-none') { ui.sel.clear(); render(); return; }
+    if (a === 'bmic-all') { setBmic(S.rooms.map(function (r) { return r.id; })); return; }
+    if (a === 'bmic-sel') { setBmic(selectedIds()); return; }
+    if (a === 'bmic-off') { setBmic([]); return; }
+    if (a === 'share-all') { startShare(S.rooms.map(function (r) { return r.id; })); return; }
+    if (a === 'share-sel') { startShare(selectedIds()); return; }
+    if (a === 'share-stop') { stopShare(); return; }
+    if (a === 'bc-send-all') { sendBroadcast('all'); return; }
+    if (a === 'chat-open') { ui.chatRoom = room; ui.unread[room] = 0; ensureDock(); renderDock(true); render(); setTimeout(function () { var i = $('dock-in'); if (i) i.focus(); }, 30); return; }
+    if (a === 'chat-close') { ui.chatRoom = null; renderDock(false); render(); return; }
+    if (a === 'em-save') { saveEm(false); return; }
+    if (a === 'em-reset') { saveEm(true); return; }
     if (a === 'watch') {
       if (ui.watch.has(room)) ui.watch.delete(room); else ui.watch.add(room);
       syncViews(); applyHear(); render();
@@ -586,6 +825,11 @@
   document.addEventListener('change', function (e) {
     var el = e.target;
     if (el && el.matches && el.matches('select.mv')) doMove(el.getAttribute('data-pid'), el.value || null);
+    else if (el && el.matches && el.matches('input[data-sel]')) {
+      var id = el.getAttribute('data-sel');
+      if (el.checked) ui.sel.add(id); else ui.sel.delete(id);
+      renderBcTop();
+    }
   });
 
   // arrastar e soltar (aluno -> sala ou "sem sala")

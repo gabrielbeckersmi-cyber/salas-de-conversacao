@@ -41,6 +41,15 @@
     say('<div class="card join"><h1>' + A.esc(title) + '</h1><p>' + A.esc(text) + '</p></div>');
   }
 
+  function screenEnd(em) {
+    var text = em && em.text ? em.text : 'Obrigado por participar! Até a próxima.';
+    var btn = '';
+    if (em && em.url && /^https?:\/\//i.test(em.url)) {
+      btn = '<p><a class="btn btn-primary" href="' + A.esc(em.url) + '" target="_blank" rel="noopener noreferrer">' + A.esc(em.label || 'Abrir link') + '</a></p>';
+    }
+    say('<div class="card join"><h1>Aula encerrada</h1><p class="endmsg">' + A.esc(text) + '</p>' + btn + '</div>');
+  }
+
   function screenJoin(note) {
     var started = publicInfo && publicInfo.phase !== 'lobby';
     var saved = '';
@@ -119,15 +128,80 @@
       snap = m.data;
       offset = snap.now - Date.now();
       render();
+    } else if (m.type === 'chat') {
+      if (snap && snap.room && m.roomId === snap.room.id) addChat(m.msg);
     }
   }
+
+  // ---------- chat da sala ----------
+  var chat = { roomId: null, list: [], ids: new Set() };
+  var chatListEl = $('l-chat-list');
+  function chatNearBottom() { return chatListEl.scrollHeight - chatListEl.scrollTop - chatListEl.clientHeight < 60; }
+  function chatHTML(m) {
+    var mine = snap && snap.me && m.pid === snap.me.pid;
+    if (m.from === 'professor') return '<div class="cm prof"><span class="who">Professor</span>' + A.esc(m.text) + '</div>';
+    return '<div class="cm' + (mine ? ' me' : '') + '"><span class="who">' + A.esc(mine ? 'Você' : m.name) + '</span>' + A.esc(m.text) + '</div>';
+  }
+  function renderChat(stick) {
+    chatListEl.innerHTML = chat.list.length ? chat.list.map(chatHTML).join('') : '<p class="none">Nenhuma mensagem ainda.</p>';
+    if (stick) chatListEl.scrollTop = chatListEl.scrollHeight;
+  }
+  function addChat(m) {
+    if (chat.ids.has(m.id)) return;
+    chat.ids.add(m.id);
+    chat.list.push(m);
+    var stick = chatNearBottom() || (snap && m.pid === snap.me.pid);
+    renderChat(stick);
+  }
+  function syncChat() {
+    var id = snap && snap.room ? snap.room.id : null;
+    if (id === chat.roomId) return;
+    chat = { roomId: id, list: [], ids: new Set() };
+    renderChat(true);
+    if (!id || !session) return;
+    A.api('GET', '/api/classes/' + encodeURIComponent(classId) + '/chat?studentId=' + encodeURIComponent(session.studentId)).then(function (r) {
+      if (chat.roomId !== id) return;
+      r.messages.forEach(function (m) { if (!chat.ids.has(m.id)) { chat.ids.add(m.id); chat.list.push(m); } });
+      chat.list.sort(function (a, b) { return a.id - b.id; });
+      renderChat(true);
+    }, function () { /* ignorar */ });
+  }
+  $('l-chat-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var inp = $('l-chat-in');
+    var text = inp.value.trim();
+    if (!text || !session) return;
+    inp.value = '';
+    A.api('POST', '/api/classes/' + encodeURIComponent(classId) + '/chat', { studentId: session.studentId, text: text }).catch(function (ex) {
+      inp.value = text;
+      setWarn(ex.message, false);
+      setTimeout(function () { setWarn(null); }, 3000);
+    });
+  });
+
+  // ---------- tela compartilhada pelo professor ----------
+  var screenVideo = $('l-screen-video');
+  function showScreen(track) {
+    track.attach(screenVideo);
+    $('l-screen').hidden = false;
+    var p = screenVideo.play(); if (p && p.catch) p.catch(function () { /* ignorar */ });
+  }
+  function hideScreen() {
+    screenVideo.srcObject = null;
+    $('l-screen').hidden = true;
+  }
+  $('l-screen-fs').addEventListener('click', function () {
+    var el = $('l-screen');
+    var f = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (f) f.call(el);
+  });
 
   function render() {
     $('title').textContent = snap.title;
     var running = snap.phase === 'r1' || snap.phase === 'r2';
     if (snap.phase === 'done') {
       leaveLive(); stopCheck(); window.Jogo.stop();
-      screenMessage('Aula encerrada', 'Obrigado por participar! Até a próxima.');
+      screenEnd(snap.endMessage);
       return;
     }
     if (running && snap.room) {
@@ -398,7 +472,9 @@
       if (seq !== connSeq) return;
       if (track.kind === 'audio') {
         audioBox.appendChild(track.attach());
-      } else if (track.kind === 'video' && p.identity !== 'professor') {
+      } else if (track.kind === 'video' && p.identity === 'professor') {
+        showScreen(track);
+      } else if (track.kind === 'video') {
         var t = getTile(p.identity, p.name);
         track.attach(t.video);
         t.el.classList.add('has-video');
@@ -407,6 +483,7 @@
     });
     room.on(E.TrackUnsubscribed, function (track, pub, p) {
       track.detach().forEach(function (el) { if (el.tagName === 'AUDIO') el.remove(); });
+      if (track.kind === 'video' && p.identity === 'professor') { hideScreen(); return; }
       var t = tiles.get(p.identity);
       if (t && track.kind === 'video') t.el.classList.remove('has-video');
     });
@@ -441,6 +518,7 @@
     clearTimeout(retryTimer);
     if (live) { var old = live.room; live = null; try { old.disconnect(); } catch (e) { /* ignorar */ } }
     clearTiles();
+    hideScreen();
     return bestDevices().then(function (d) {
       if (seq !== connSeq) return;
       return startLiveWith(lk, seq, d);
@@ -526,6 +604,7 @@
     clearTimeout(retryTimer);
     if (live) { var r = live.room; live = null; try { r.disconnect(); } catch (e) { /* ignorar */ } }
     clearTiles();
+    hideScreen();
     setWarn(null);
     setStatus('');
     releaseWake();
@@ -561,6 +640,7 @@
     call.setAttribute('aria-disabled', String(!!r.calling));
     $('l-cancel').hidden = !r.calling;
     syncTiles();
+    syncChat();
     tickTimer();
   }
 
@@ -601,7 +681,7 @@
       publicInfo = info;
       $('title').textContent = info.title;
       if (session) openSession();
-      else if (info.phase === 'done') screenMessage('Aula encerrada', 'Esta aula já terminou.');
+      else if (info.phase === 'done') screenEnd(info.endMessage);
       else screenJoin();
     }, function (e) {
       if (e.status === 404) screenMessage('Aula não encontrada', 'Confira o link que o professor enviou.');
