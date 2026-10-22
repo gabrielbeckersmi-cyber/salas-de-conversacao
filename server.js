@@ -17,7 +17,8 @@ function build(env) {
     lkSecret: env.LIVEKIT_API_SECRET || '',
     password: env.PROFESSOR_PASSWORD || '',
     dataFile: env.DATA_FILE || path.join(__dirname, 'data', 'classes.json'),
-    retentionDays: Number(env.RETENTION_DAYS || 30)
+    retentionDays: Number(env.RETENTION_DAYS || 30),
+    firebaseUrl: env.FIREBASE_DB_URL === undefined ? 'https://app-conversacao-default-rtdb.firebaseio.com' : env.FIREBASE_DB_URL
   };
   cfg.sessionSecret = env.SESSION_SECRET ||
     crypto.createHash('sha256').update('salas-conversacao:' + cfg.password + ':' + cfg.lkSecret).digest('hex');
@@ -199,7 +200,7 @@ function build(env) {
   // --- aluno ---
   app.get('/api/classes/:id/public', function (req, res) {
     const c = getClass(req.params.id);
-    res.json({ title: c.title, phase: c.phase, endMessage: c.phase === 'done' ? (c.endMessage || null) : null });
+    res.json({ title: c.title, phase: c.phase, allowLate: !!c.allowLate, endMessage: c.phase === 'done' ? (c.endMessage || null) : null });
   });
 
   app.post('/api/classes/:id/join', function (req, res) {
@@ -259,6 +260,40 @@ function build(env) {
     res.json({ best: best });
   });
 
+  // saída imediata (botão Sair ou fechar a página): o professor vê o aluno offline na hora
+  app.post('/api/classes/:id/leave', function (req, res) {
+    const c = getClass(req.params.id);
+    const sid = String((req.body && req.body.studentId) || '');
+    const s = c.students[sid];
+    if (s) {
+      const set = reg(c.id).students.get(sid);
+      if (set) { Array.from(set).forEach(function (ws) { try { ws.close(4005, 'left'); } catch (e) { /* ignorar */ } }); reg(c.id).students.delete(sid); }
+      C.setOnline(c, sid, false);
+      schedule(c);
+    }
+    res.json({ ok: true });
+  });
+
+  let temasCache = { at: 0, v: { t1: '', t2: '' } };
+  async function fetchTema(key) {
+    const base = String(cfg.firebaseUrl || '').replace(/\/$/, '');
+    const r = await fetch(base + '/' + key + '.json', { signal: AbortSignal.timeout(4000) });
+    if (!r.ok) throw new Error('firebase ' + r.status);
+    const v = await r.json();
+    return v == null ? '' : String(v).replace(/\s+/g, ' ').trim().slice(0, 200);
+  }
+  app.get('/api/temas', async function (req, res) {
+    if (cfg.firebaseUrl && Date.now() - temasCache.at > 60000) {
+      try {
+        const r = await Promise.all([fetchTema('temaEscolhido1'), fetchTema('temaEscolhido2')]);
+        temasCache = { at: Date.now(), v: { t1: r[0], t2: r[1] } };
+      } catch (e) {
+        temasCache.at = Date.now() - 45000; // tenta de novo em 15 s; enquanto isso mostra o último valor
+      }
+    }
+    res.json(temasCache.v);
+  });
+
   app.post('/api/classes/:id/call', function (req, res) {
     const c = getClass(req.params.id);
     const s = c.students[String(req.body.studentId)];
@@ -312,6 +347,7 @@ function build(env) {
       case 'hear': C.setHear(c, b.roomId, b.mode); break;
       case 'answer': C.answerCall(c, b.roomId); break;
       case 'bmic': C.setBroadcastMic(c, b.roomIds); break;
+      case 'allow-late': C.setAllowLate(c, b.on); break;
       case 'end-message': C.setEndMessage(c, b); break;
       case 'chat': C.teacherSay(c, b.roomIds, b.text, b.name).forEach(function (x) { sendChat(c, x.roomId, x.msg); }); break;
       case 'kick': { const s = C.kick(c, b.pid); disconnectStudent(c, s.id); break; }
@@ -367,7 +403,7 @@ function build(env) {
     if (!r.students.has(sid)) r.students.set(sid, new Set());
     r.students.get(sid).add(ws);
     C.setOnline(c, sid, true);
-    if (C.isLive(c) && !C.roomOf(c, s.pid)) C.placeStudentLive(c, s);
+    if (C.isLive(c) && !C.roomOf(c, s.pid) && !s.late) C.placeStudentLive(c, s); // quem entrou depois (liberado pelo professor) espera em "Sem sala"
     ws.on('close', function () {
       const set = r.students.get(sid);
       if (set) {
@@ -381,11 +417,12 @@ function build(env) {
 
   const heartbeat = setInterval(function () {
     wss.clients.forEach(function (ws) {
-      if (!ws.isAlive) { ws.terminate(); return; }
+      if (ws.isAlive) ws.missed = 0; else ws.missed = (ws.missed || 0) + 1;
+      if (ws.missed >= 2) { ws.terminate(); return; } // sem resposta por ~10 s: conexão perdida
       ws.isAlive = false;
       try { ws.ping(); } catch (e) { /* ignorar */ }
     });
-  }, 25000);
+  }, 5000);
   heartbeat.unref();
 
   function listen(port) {

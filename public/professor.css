@@ -173,3 +173,8 @@
 .tile.offline, .pchip.offline { box-shadow: inset 0 0 0 3px var(--live); animation: offblink 1s ease-in-out infinite; }
 @keyframes offblink { 0%, 100% { box-shadow: inset 0 0 0 3px var(--live); } 50% { box-shadow: inset 0 0 0 3px transparent; } }
 @media (prefers-reduced-motion: reduce) { .tile.offline, .pchip.offline { animation: none; } }
+
+.temas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 8px; }
+.temas .tema { background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; font-size: 14px; font-weight: 600; }
+.statsrow .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }

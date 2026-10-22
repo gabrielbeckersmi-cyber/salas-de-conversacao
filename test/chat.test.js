@@ -27,10 +27,12 @@ test('chat por sala, mensagens do professor, microfone e mensagem final', () => 
   assert.throws(() => C.studentSay(c, list[0], '   '), /Digite/);
   assert.strictEqual(C.studentSay(c, list[0], 'x'.repeat(1000)).msg.text.length, 300);
 
-  const t = C.teacherSay(c, [room.id], 'Atenção!');
+  const t = C.teacherSay(c, [room.id], 'Atenção!', '  Gabriel  ');
+  assert.strictEqual(t[0].msg.name, 'Gabriel');
+  assert.strictEqual(C.teacherSay(c, [room.id], 'sem nome')[0].msg.name, 'Professor');
   assert.strictEqual(t.length, 1);
   assert.strictEqual(t[0].msg.from, 'professor');
-  assert.strictEqual(C.chatHistory(c, room.id).length, 3);
+  assert.strictEqual(C.chatHistory(c, room.id).length, 4);
   assert.strictEqual(C.chatHistory(c, other.id).length, 0, 'outra sala não recebe');
   const all = C.teacherSay(c, 'all', 'Para todas');
   assert.strictEqual(all.length, c.rooms.length);

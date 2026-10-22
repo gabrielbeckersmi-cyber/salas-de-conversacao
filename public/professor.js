@@ -546,6 +546,22 @@
     return '';
   }
 
+  function temasHTML() {
+    var t = ui.temas || {};
+    var items = [t.t1, t.t2].filter(Boolean);
+    if (!items.length) return '';
+    return '<div class="temas"><span class="lbl-t">Temas sugeridos</span>' + items.map(function (x) { return '<span class="tema">' + esc(x) + '</span>'; }).join('') + '</div>';
+  }
+  function loadTemas() {
+    fetch('/api/temas').then(function (r) { return r.json(); }).then(function (t) {
+      var a = JSON.stringify(t), b = JSON.stringify(ui.temas || {});
+      ui.temas = t;
+      if (a !== b && S && !ui.confirm) render();
+    }).catch(function () { /* ignorar */ });
+  }
+  loadTemas();
+  setInterval(loadTemas, 60000);
+
   function render() {
     if (!S) return;
     var fa = document.activeElement;
@@ -564,7 +580,7 @@
 
     var main = { lobby: ['Iniciar aula', 'start'], between: ['Iniciar rodada 2', 'start'], r1: ['Encerrar rodada 1', 'end-round'], r2: ['Encerrar rodada 2', 'end-round'] }[S.phase];
     var h = '<header class="topbar"><div><p class="small"><a href="/professor">&larr; Aulas</a></p><h1>' + esc(S.title) + '</h1>' +
-      '<div class="linkrow" style="margin-top:8px"><input class="input" readonly value="' + esc(url) + '" aria-label="Link da aula para os alunos"><button class="btn btn-sm" data-act="copy-link" data-url="' + esc(url) + '" type="button">' + A.ICON.link + 'Copiar link</button></div></div>' +
+      '<div class="linkrow" style="margin-top:8px"><input class="input" readonly value="' + esc(url) + '" aria-label="Link da aula para os alunos"><button class="btn btn-sm" data-act="copy-link" data-url="' + esc(url) + '" type="button">' + A.ICON.link + 'Copiar link</button></div>' + temasHTML() + '</div>' +
       '<div class="clock"><div><div class="phase">' + PHASE_LABEL[S.phase] + '</div><div class="timer idle" id="p-timer">' + A.mmss(S.roundMinutes * 60) + '</div><div class="bar" aria-hidden="true"><i id="p-bar"></i></div></div>' +
       (main ? '<button class="btn btn-primary" data-act="main" type="button">' + main[0] + '</button>' : '') + '</div></header>';
 
@@ -573,7 +589,9 @@
       '<span class="lv-inter"><i class="dot"></i><b>' + counts.intermediario + '</b> Intermediário</span>' +
       (S.rooms.length ? '<span><b>' + S.rooms.length + '</b> salas</span>' : '') +
       (unassigned.length ? '<span><b>' + unassigned.length + '</b> sem sala</span>' : '') + '</div>' +
-      (planning || live ? '<button class="btn btn-sm" data-act="ask-end-class" type="button">Encerrar aula</button>' : '') + '</div>';
+      '<span class="actions">' +
+      (S.phase !== 'lobby' ? '<button class="btn btn-sm' + (S.allowLate ? ' on' : '') + '" data-act="allow-late" type="button" aria-pressed="' + (S.allowLate ? 'true' : 'false') + '" title="Libera a entrada de alunos atrasados. Eles esperam em Sem sala até você colocá-los em uma sala.">' + (S.allowLate ? 'Permitir alunos: ligado' : 'Permitir alunos') + '</button>' : '') +
+      (planning || live ? '<button class="btn btn-sm" data-act="ask-end-class" type="button">Encerrar aula</button>' : '') + '</span></div>';
 
     if (ui.net) h += '<div class="msg info" role="status">Conexão instável. Reconectando…</div>';
     if (ui.warn) h += '<div class="msg err" role="alert">' + esc(ui.warn) + '</div>';
@@ -940,6 +958,7 @@
     }
     if (!S) return;
     if (a === 'main') { ui.confirm = isPlanning() ? 'start' : 'end-round'; render(); return; }
+    if (a === 'allow-late') { act({ action: 'allow-late', on: !S.allowLate }); return; }
     if (a === 'ask-end-class') { ui.confirm = 'end-class'; render(); return; }
     if (a === 'confirm-no') { ui.confirm = null; render(); return; }
     if (a === 'confirm-yes') {

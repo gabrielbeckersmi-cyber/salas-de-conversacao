@@ -40,6 +40,7 @@
   leaveBtn.hidden = true;
   A.topctl().insertBefore(leaveBtn, A.topctl().firstChild);
   function showOnly(which) {
+    document.body.classList.toggle('in-live', which === 'live');
     leaveBtn.hidden = which === 'screen';
     screenEl.hidden = which !== 'screen';
     waitingEl.hidden = which !== 'waiting';
@@ -51,8 +52,22 @@
   }
 
   // ---------- sair e voltar ----------
+  function sendLeave() {
+    if (!session) return;
+    var url = '/api/classes/' + encodeURIComponent(classId) + '/leave';
+    var body = JSON.stringify({ studentId: session.studentId });
+    try {
+      if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))) return;
+    } catch (e) { /* ignorar */ }
+    try { fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }); } catch (e) { /* ignorar */ }
+  }
+  // fechar a aba ou a página: o professor vê o aluno offline na hora
+  window.addEventListener('pagehide', function (ev) { if (!ev.persisted && conn) sendLeave(); });
+
   function leaveClass() {
     if (conn) { conn.close(); conn = null; }
+    sendLeave();
+    resetTutorial();
     leaveLive(); stopCheck(); window.Jogo.stop();
     snap = null;
     say('<div class="card join"><h1>Você saiu da aula</h1><p>Quando quiser, volte para a aula. Você entra na mesma sala em que estava.</p>' +
@@ -71,7 +86,7 @@
   }
 
   function screenJoin(note) {
-    var started = publicInfo && publicInfo.phase !== 'lobby';
+    var started = publicInfo && publicInfo.phase !== 'lobby' && !publicInfo.allowLate;
     var saved = '';
     try { saved = localStorage.getItem('salas:level') || ''; } catch (e) { saved = ''; }
     var lv = saved === 'intermediario' ? 'intermediario' : 'basico';
@@ -79,7 +94,7 @@
       '<h1>' + A.esc(publicInfo ? publicInfo.title : 'Aula de conversação') + '</h1>' +
       (started
         ? '<div class="msg info">Esta aula já começou e não aceita novos alunos. Se você já tinha entrado, digite o mesmo nome para voltar.</div>'
-        : '<p>Digite seu nome e escolha o nível em que você se sente mais confortável para conversar.</p>') +
+        : '') +
       (note ? '<div class="msg err" role="alert">' + A.esc(note) + '</div>' : '') +
       '<div class="field"><label class="lbl" for="j-name">Seu nome</label><input class="input" id="j-name" maxlength="30" autocomplete="name" placeholder="Ex.: Marcos P." required></div>' +
       '<div class="field"><span class="lbl-t">Seu nível</span><fieldset class="seg" aria-label="Seu nível">' +
@@ -88,7 +103,6 @@
       }).join('') + '</fieldset></div>' +
       '<div class="msg err" id="j-err" role="alert" hidden></div>' +
       '<button class="btn btn-primary" id="j-go" type="submit">Entrar na aula</button>' +
-      '<p class="small">Depois que a aula começar, novos alunos não conseguem entrar. Entre com antecedência e mantenha esta página aberta.</p>' +
       '</form>');
     var form = $('join-form');
     form.addEventListener('submit', function (e) {
@@ -271,6 +285,7 @@
     }
     if (running && snap.room) {
       stopCheck(); window.Jogo.stop();
+      resetTutorial(); $('tut').hidden = true;
       showOnly('live');
       updateLive();
       connectLive(snap.room.lk, snap.room.lkError);
@@ -312,11 +327,48 @@
       $('w-note').textContent = 'Mantenha esta página aberta.';
     } else {
       $('w-phase').textContent = 'Sala de espera';
-      $('w-head').textContent = 'O professor está online e iniciará a aula no horário marcado, aguarde mais alguns instantes.';
-      $('w-sub').textContent = 'Pode jogar enquanto espera! Você entrou como ' + snap.me.name + ' (nível ' + lvl + '). ' + snap.waiting.online + (snap.waiting.online === 1 ? ' aluno está' : ' alunos estão') + ' na sala de espera.';
-      $('w-note').textContent = 'Quando a aula começar, você entra automaticamente em uma sala com colegas do seu nível. Depois do início, novos alunos não conseguem entrar.';
+      $('w-head').textContent = '';
+      $('w-sub').textContent = '';
+      $('w-note').textContent = '';
+      maybeTutorial();
     }
   }
+
+  // ---------- temas sugeridos (Firebase, via servidor) ----------
+  function loadThemes() {
+    fetch('/api/temas').then(function (r) { return r.json(); }).then(function (t) {
+      var items = [t.t1, t.t2].filter(Boolean);
+      $('themes').hidden = !items.length;
+      $('themes-list').innerHTML = items.map(function (x) { return '<li>' + A.esc(x) + '</li>'; }).join('');
+    }).catch(function () { /* ignorar */ });
+  }
+  loadThemes();
+  setInterval(loadThemes, 60000);
+
+  // ---------- tutorial em vídeo (sala de espera da 1ª rodada) ----------
+  var TUT_KEY = 'salas:notut';
+  var tutShown = false;
+  function isPhone() {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 900);
+  }
+  function maybeTutorial() {
+    if (tutShown) return;
+    var never = false;
+    try { never = localStorage.getItem(TUT_KEY) === '1'; } catch (e) { never = false; }
+    if (never) return;
+    tutShown = true;
+    var url = isPhone() ? 'https://hotm.io/tutorialconversacaocelular' : 'https://hotm.io/tutorialconversacaopc';
+    $('tut-frame').src = url;
+    $('tut-link').href = url;
+    $('tut').hidden = false;
+  }
+  $('tut-close').addEventListener('click', function () {
+    if ($('tut-never').checked) { try { localStorage.setItem(TUT_KEY, '1'); } catch (e) { /* ignorar */ } }
+    $('tut').hidden = true;
+    $('tut-frame').src = 'about:blank'; // para o vídeo
+  });
+  // tutShown volta a falso quando o aluno sai da sala de espera da 1ª rodada, para aparecer na próxima entrada
+  function resetTutorial() { tutShown = false; }
 
   // ---------- escolha de câmera e microfone ----------
   var PREF_KEY = 'salas:devices';
@@ -368,7 +420,7 @@
   var check = null;
   function checkStatus(text, cls) {
     var el = $('w-status');
-    el.textContent = text;
+    el.textContent = cls === 'msg err' ? text : ''; // só erros aparecem; o resto fica em silêncio
     el.className = cls || 'small';
   }
   function startCheck(opts) {
@@ -411,6 +463,7 @@
       }
       check = { stream: stream, ctx: ctx, raf: raf };
       $('w-test').textContent = 'Desligar o teste';
+      $('w-meter-box').hidden = false;
       checkStatus('Câmera e microfone funcionando. Fale algo e veja a barra se mexer.', 'msg ok');
       // agora os nomes dos aparelhos estão disponíveis: preenche as listas
       listDevices().then(function (l) {
@@ -445,6 +498,7 @@
     v.srcObject = null;
     v.hidden = true;
     $('w-meter').style.width = '0';
+    $('w-meter-box').hidden = true;
     $('w-test').textContent = 'Testar câmera e microfone';
   }
   $('w-cam').addEventListener('change', function () { var p = loadPrefs(); p.cam = this.value; savePrefs(p); startCheck({ cam: p.cam, mic: p.mic, retried: true }); });

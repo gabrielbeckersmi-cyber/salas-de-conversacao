@@ -16,7 +16,20 @@
   .card h2 { font-size: 17px; font-weight: 600; }
   .field label.lbl { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 5px; }
   .join { max-width: 460px; margin: 4vh auto 0; width: 100%; }
-  .check { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  #w-head:empty, #w-sub:empty, #w-note:empty, #w-status:empty { display: none; }
+  .themes { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 4px 0 14px; max-width: 640px; }
+  .themes h2 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .themes ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .themes li { font-size: 17px; font-weight: 600; line-height: 1.3; }
+  .tut { position: fixed; inset: 0; z-index: 300; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .tut[hidden] { display: none; }
+  .tut-box { background: var(--surface); color: var(--ink); border-radius: 14px; width: 100%; max-width: 760px; max-height: 100%; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .tut-box h2 { font-size: 18px; font-weight: 600; }
+  .tut-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; background: #000; }
+  .tut-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .tut-foot label { display: flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
+  .tut-foot input { width: 20px; height: 20px; }
+  .check { padding-top: 4px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
   .check video { width: 100%; max-width: 320px; aspect-ratio: 4 / 3; border-radius: 8px; background: #000; object-fit: cover; transform: scaleX(-1); }
   .meter { height: 8px; width: 100%; max-width: 320px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
   .meter i { display: block; height: 100%; width: 0; background: var(--ok); transition: width 0.08s linear; }
@@ -79,6 +92,32 @@
   #live { display: flex; flex-direction: column; gap: 16px; }
   #live[hidden] { display: none; }
   .status:empty { display: none; }
+  .live-body, .live-main, .live-side { display: contents; }
+  @media (min-width: 900px) and (min-height: 560px) {
+    body.in-live { overflow: hidden; padding-block: 0; }
+    body.in-live .wrap { max-width: none; height: 100vh; height: 100dvh; overflow: hidden; padding: 52px 20px 16px; gap: 10px; box-sizing: border-box; }
+    body.in-live .brand, body.in-live .netbar { flex: none; }
+    body.in-live #live { flex: 1; min-height: 0; gap: 10px; }
+    body.in-live .live-top { flex: none; }
+    body.in-live .live-top h1 { font-size: 20px; }
+    body.in-live .timer { font-size: 26px; }
+    body.in-live .live-body { display: grid; grid-template-columns: minmax(0, 1fr) 380px; grid-template-rows: minmax(0, 1fr); gap: 16px; flex: 1; min-height: 0; overflow: hidden; }
+    body.in-live .live-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; }
+    body.in-live .live-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; }
+    body.in-live .live-main .tiles { flex: 1; min-height: 0; overflow: hidden; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); grid-auto-rows: minmax(0, 1fr); }
+    body.in-live .live-main .tiles .tile { aspect-ratio: auto; height: 100%; min-height: 0; }
+    body.in-live .live-main .screen { flex: 1 1 55%; min-height: 0; display: flex; flex-direction: column; }
+    body.in-live .live-main .screen video { flex: 1; min-height: 0; max-height: none; }
+    body.in-live .live-main .screen.expanded { position: fixed; }
+    body.in-live .controls { order: 1; flex: none; }
+    body.in-live .devs { order: 2; flex: none; }
+    body.in-live .live-side .call-big { min-height: 52px; font-size: 17px; margin-top: 0; flex: none; }
+    body.in-live .live-side .btn { flex: none; }
+    body.in-live .live-side .chat { flex: 1; min-height: 0; padding: 12px; gap: 8px; }
+    body.in-live .live-side .chat-body { flex: 1; min-height: 0; }
+    body.in-live .live-side .chat-list { flex: 1; height: auto; min-height: 0; }
+    body.in-live .live-side .chat-form { position: static; margin: 0; padding: 0; }
+  }
   .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .controls .btn { min-height: 48px; padding: 8px 8px; gap: 6px; font-size: 15px; white-space: nowrap; }
   .call-big { margin-top: 4px; min-height: 64px; font-size: 19px; font-family: var(--font-display); width: 100%; }
@@ -107,6 +146,10 @@
         <h1 id="w-head">Aguardando o professor iniciar a aula</h1>
         <p id="w-sub"></p>
         <p class="small" id="w-note"></p>
+        <div class="themes" id="themes" hidden>
+          <h2>Temas sugeridos da aula</h2>
+          <ul id="themes-list"></ul>
+        </div>
         <div class="game" id="game">
           <canvas id="game-canvas" aria-label="Joguinho: pule os lápis" role="img"></canvas>
           <p class="small" id="game-score">Pontos: 0</p>
@@ -116,14 +159,13 @@
           </div>
         </div>
         <div class="check">
-          <h2>Teste sua câmera e microfone</h2>
           <div class="devrow" id="w-dev" hidden>
             <label>Câmera <select id="w-cam"></select></label>
             <label>Microfone <select id="w-mic"></select></label>
           </div>
           <video id="w-video" muted playsinline hidden></video>
-          <div class="meter" aria-hidden="true"><i id="w-meter"></i></div>
-          <p class="small" id="w-status">Faça o teste agora para não perder tempo quando a aula começar.</p>
+          <div class="meter" id="w-meter-box" aria-hidden="true" hidden><i id="w-meter"></i></div>
+          <p class="small" id="w-status" role="status"></p>
           <button class="btn" id="w-test" type="button">Testar câmera e microfone</button>
         </div>
       </div>
@@ -140,41 +182,59 @@
         <button class="btn btn-sm" id="l-retry" type="button" hidden>Tentar de novo</button>
       </div>
       <div class="status" id="l-status" role="status"></div>
-      <div class="screen" id="l-screen" hidden>
-        <div class="screen-head"><span>Tela do professor</span><button class="btn btn-sm" id="l-screen-fs" type="button">Tela cheia</button></div>
-        <video id="l-screen-video" autoplay playsinline muted></video>
+      <div class="live-body">
+        <div class="live-main">
+          <div class="screen" id="l-screen" hidden>
+            <div class="screen-head"><span>Tela do professor</span><button class="btn btn-sm" id="l-screen-fs" type="button">Tela cheia</button></div>
+            <video id="l-screen-video" autoplay playsinline muted></video>
+          </div>
+          <div class="tiles" id="l-tiles"></div>
+          <div id="l-audio" hidden></div>
+          <details class="devs" id="l-devs" hidden>
+            <summary>Trocar câmera ou microfone</summary>
+            <div class="devrow">
+              <label>Câmera <select id="l-cam-sel"></select></label>
+              <label>Microfone <select id="l-mic-sel"></select></label>
+            </div>
+          </details>
+          <div class="controls">
+            <button class="btn" id="l-mic" type="button"></button>
+            <button class="btn" id="l-cam" type="button"></button>
+          </div>
+        </div>
+        <div class="live-side">
+          <button class="btn btn-sm" id="l-sound" type="button" hidden>Ativar o som da sala</button>
+          <button class="btn btn-call call-big" id="l-call" type="button"></button>
+          <button class="btn btn-sm" id="l-cancel" type="button" hidden>Cancelar chamado</button>
+          <section class="chat" id="l-chat" aria-label="Chat da sala">
+            <div class="chat-head">
+              <h2>Chat da sala</h2>
+              <button class="btn btn-sm chat-toggle" id="l-chat-toggle" type="button" aria-expanded="true">Esconder chat</button>
+            </div>
+            <div class="chat-body" id="l-chat-body">
+              <div class="chat-list" id="l-chat-list" role="log" aria-live="polite"></div>
+              <form class="chat-form" id="l-chat-form" autocomplete="off">
+                <input class="input" id="l-chat-in" maxlength="300" placeholder="Escreva para a sala…" aria-label="Mensagem para a sala">
+                <button class="btn btn-primary" type="submit">Enviar</button>
+              </form>
+            </div>
+          </section>
+        </div>
       </div>
-      <div class="tiles" id="l-tiles"></div>
-      <div id="l-audio" hidden></div>
-      <details class="devs" id="l-devs" hidden>
-        <summary>Trocar câmera ou microfone</summary>
-        <div class="devrow">
-          <label>Câmera <select id="l-cam-sel"></select></label>
-          <label>Microfone <select id="l-mic-sel"></select></label>
-        </div>
-      </details>
-      <div class="controls">
-        <button class="btn" id="l-mic" type="button"></button>
-        <button class="btn" id="l-cam" type="button"></button>
-      </div>
-      <button class="btn btn-sm" id="l-sound" type="button" hidden>Ativar o som da sala</button>
-      <button class="btn btn-call call-big" id="l-call" type="button"></button>
-      <button class="btn btn-sm" id="l-cancel" type="button" hidden>Cancelar chamado</button>
-      <section class="chat" id="l-chat" aria-label="Chat da sala">
-        <div class="chat-head">
-          <h2>Chat da sala</h2>
-          <button class="btn btn-sm chat-toggle" id="l-chat-toggle" type="button" aria-expanded="true">Esconder chat</button>
-        </div>
-        <div class="chat-body" id="l-chat-body">
-          <div class="chat-list" id="l-chat-list" role="log" aria-live="polite"></div>
-          <form class="chat-form" id="l-chat-form" autocomplete="off">
-            <input class="input" id="l-chat-in" maxlength="300" placeholder="Escreva para a sala…" aria-label="Mensagem para a sala">
-            <button class="btn btn-primary" type="submit">Enviar</button>
-          </form>
-        </div>
-      </section>
     </section>
   </main>
+
+  <div class="tut" id="tut" role="dialog" aria-modal="true" aria-label="Tutorial em vídeo" hidden>
+    <div class="tut-box">
+      <h2>Como funciona a aula</h2>
+      <iframe class="tut-frame" id="tut-frame" title="Tutorial em vídeo" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+      <a class="small" id="tut-link" href="#" target="_blank" rel="noopener noreferrer">O vídeo não abriu? Toque aqui para assistir.</a>
+      <div class="tut-foot">
+        <label><input type="checkbox" id="tut-never"> não ver novamente</label>
+        <button class="btn btn-primary" id="tut-close" type="button">Fechar</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/vendor/livekit-client.umd.js"></script>
   <script src="/shared.js"></script>

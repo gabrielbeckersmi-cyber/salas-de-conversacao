@@ -48,7 +48,7 @@ window.App = (function () {
       });
   }
 
-  // WebSocket com reconexão automática. Códigos 4001-4004 (login, removido, não encontrado) não reconectam.
+  // WebSocket com reconexão automática. Códigos 4001-4005 (login, removido, não encontrado, saiu) não reconectam.
   function connectWS(path, h) {
     var ws = null;
     var closed = false;
@@ -64,7 +64,7 @@ window.App = (function () {
       };
       ws.onclose = function (e) {
         if (h.onClose) h.onClose(e);
-        if (closed || (e.code >= 4001 && e.code <= 4004)) return;
+        if (closed || (e.code >= 4001 && e.code <= 4005)) return;
         tries++;
         timer = setTimeout(open, Math.min(8000, 500 * Math.pow(2, Math.min(tries, 4))));
       };
