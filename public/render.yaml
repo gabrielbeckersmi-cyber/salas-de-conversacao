@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: salas-de-conversacao
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: PROFESSOR_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
