@@ -110,12 +110,12 @@
     $('title').textContent = snap.title;
     var running = snap.phase === 'r1' || snap.phase === 'r2';
     if (snap.phase === 'done') {
-      leaveLive(); stopCheck();
+      leaveLive(); stopCheck(); window.Jogo.stop();
       screenMessage('Aula encerrada', 'Obrigado por participar! Até a próxima.');
       return;
     }
     if (running && snap.room) {
-      stopCheck();
+      stopCheck(); window.Jogo.stop();
       showOnly('live');
       updateLive();
       connectLive(snap.room.lk, snap.room.lkError);
@@ -124,6 +124,7 @@
     leaveLive();
     showOnly('waiting');
     updateWaiting(running);
+    window.Jogo.start();
   }
 
   // ---------- sala de espera ----------
@@ -141,10 +142,56 @@
       $('w-note').textContent = 'Mantenha esta página aberta.';
     } else {
       $('w-phase').textContent = 'Sala de espera';
-      $('w-head').textContent = 'Aguardando o professor iniciar a aula';
-      $('w-sub').textContent = 'Você entrou como ' + snap.me.name + ' (nível ' + lvl + '). ' + snap.waiting.online + (snap.waiting.online === 1 ? ' aluno está' : ' alunos estão') + ' na sala de espera.';
+      $('w-head').textContent = 'O professor está online e iniciará a aula no horário marcado, aguarde mais alguns instantes.';
+      $('w-sub').textContent = 'Pode jogar enquanto espera! Você entrou como ' + snap.me.name + ' (nível ' + lvl + '). ' + snap.waiting.online + (snap.waiting.online === 1 ? ' aluno está' : ' alunos estão') + ' na sala de espera.';
       $('w-note').textContent = 'Quando a aula começar, você entra automaticamente em uma sala com colegas do seu nível. Depois do início, novos alunos não conseguem entrar.';
     }
+  }
+
+  // ---------- escolha de câmera e microfone ----------
+  var PREF_KEY = 'salas:devices';
+  var VIRTUAL = /obs|virtual|manycam|snap camera|xsplit|droidcam|epoccam|ndi|streamlabs/i;
+  function loadPrefs() { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch (e) { return {}; } }
+  function savePrefs(p) { try { localStorage.setItem(PREF_KEY, JSON.stringify(p)); } catch (e) { /* ignorar */ } }
+  function listDevices() {
+    var none = { cams: [], mics: [] };
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return Promise.resolve(none);
+    return navigator.mediaDevices.enumerateDevices().then(function (ds) {
+      return {
+        cams: ds.filter(function (d) { return d.kind === 'videoinput' && d.deviceId; }),
+        mics: ds.filter(function (d) { return d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'communications'; })
+      };
+    }, function () { return none; });
+  }
+  function realCam(list) {
+    var real = list.filter(function (d) { return !VIRTUAL.test(d.label); });
+    return real.length && real.length < list.length ? real[0] : null;
+  }
+  // devolve os aparelhos a usar: o que o aluno escolheu antes; senão evita câmera virtual (OBS etc.)
+  function bestDevices() {
+    return listDevices().then(function (l) {
+      var p = loadPrefs();
+      var cam = l.cams.some(function (d) { return d.deviceId === p.cam; }) ? p.cam : undefined;
+      if (!cam) { var rc = realCam(l.cams); if (rc) cam = rc.deviceId; }
+      var mic = l.mics.some(function (d) { return d.deviceId === p.mic; }) ? p.mic : undefined;
+      return { cam: cam, mic: mic };
+    });
+  }
+  function fillSelect(sel, list, current, label) {
+    sel.innerHTML = '';
+    list.forEach(function (d, i) {
+      var o = document.createElement('option');
+      o.value = d.deviceId;
+      o.textContent = d.label || (label + ' ' + (i + 1));
+      if (d.deviceId === current) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.disabled = !list.length;
+  }
+  function currentIds(stream) {
+    var v = stream && stream.getVideoTracks()[0];
+    var a = stream && stream.getAudioTracks()[0];
+    return { cam: v && v.getSettings().deviceId, mic: a && a.getSettings().deviceId };
   }
 
   // teste de câmera e microfone
@@ -154,14 +201,21 @@
     el.textContent = text;
     el.className = cls || 'small';
   }
-  function startCheck() {
+  function startCheck(opts) {
     stopCheck();
+    var o = opts || {};
+    var pr = loadPrefs();
+    var wantCam = o.cam || pr.cam;
+    var wantMic = o.mic || pr.mic;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       checkStatus('Este navegador não permite usar a câmera aqui. Abra o link no Chrome ou Safari atualizado.', 'msg err');
       return;
     }
     checkStatus('Pedindo permissão…', 'small');
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(function (stream) {
+    navigator.mediaDevices.getUserMedia({
+      video: wantCam ? { deviceId: { exact: wantCam } } : true,
+      audio: wantMic ? { deviceId: { exact: wantMic } } : true
+    }).then(function (stream) {
       var v = $('w-video');
       v.srcObject = stream;
       v.hidden = false;
@@ -188,7 +242,22 @@
       check = { stream: stream, ctx: ctx, raf: raf };
       $('w-test').textContent = 'Desligar o teste';
       checkStatus('Câmera e microfone funcionando. Fale algo e veja a barra se mexer.', 'msg ok');
+      // agora os nomes dos aparelhos estão disponíveis: preenche as listas
+      listDevices().then(function (l) {
+        if (check && check.stream !== stream) return;
+        var ids = currentIds(stream);
+        // câmera virtual (OBS...) escolhida automaticamente: tenta uma câmera real
+        if (!wantCam && !o.retried) {
+          var cur = l.cams.filter(function (d) { return d.deviceId === ids.cam; })[0];
+          var rc = realCam(l.cams);
+          if (cur && VIRTUAL.test(cur.label) && rc) { startCheck({ cam: rc.deviceId, mic: wantMic, retried: true }); return; }
+        }
+        fillSelect($('w-cam'), l.cams, ids.cam, 'Câmera');
+        fillSelect($('w-mic'), l.mics, ids.mic, 'Microfone');
+        $('w-dev').hidden = false;
+      });
     }).catch(function (e) {
+      if (e && e.name === 'OverconstrainedError' && (wantCam || wantMic)) { savePrefs({}); startCheck({ retried: true }); return; }
       var text = 'Não consegui acessar a câmera e o microfone.';
       if (e && e.name === 'NotAllowedError') text = 'Permissão negada. Toque no cadeado ao lado do endereço, permita câmera e microfone e tente de novo.';
       else if (e && e.name === 'NotFoundError') text = 'Nenhuma câmera ou microfone encontrado neste aparelho.';
@@ -208,6 +277,8 @@
     $('w-meter').style.width = '0';
     $('w-test').textContent = 'Testar câmera e microfone';
   }
+  $('w-cam').addEventListener('change', function () { var p = loadPrefs(); p.cam = this.value; savePrefs(p); startCheck({ cam: p.cam, mic: p.mic, retried: true }); });
+  $('w-mic').addEventListener('change', function () { var p = loadPrefs(); p.mic = this.value; savePrefs(p); startCheck({ cam: p.cam, mic: p.mic, retried: true }); });
   $('w-test').addEventListener('click', function () { if (check) { stopCheck(); checkStatus('Teste desligado.', 'small'); } else startCheck(); });
 
   // ---------- sala de vídeo ----------
@@ -339,10 +410,21 @@
     clearTimeout(retryTimer);
     if (live) { var old = live.room; live = null; try { old.disconnect(); } catch (e) { /* ignorar */ } }
     clearTiles();
+    return bestDevices().then(function (d) {
+      if (seq !== connSeq) return;
+      return startLiveWith(lk, seq, d);
+    });
+  }
+  function startLiveWith(lk, seq, d) {
+    var vdef = { resolution: { width: 640, height: 360, frameRate: 24 } };
+    if (d.cam) vdef.deviceId = d.cam;
+    var adef = {};
+    if (d.mic) adef.deviceId = d.mic;
     var room = new LK.Room({
       adaptiveStream: true,
       dynacast: true,
-      videoCaptureDefaults: { resolution: { width: 640, height: 360, frameRate: 24 } }
+      videoCaptureDefaults: vdef,
+      audioCaptureDefaults: adef
     });
     live = { room: room, name: lk.room };
     bindRoom(room, seq);
@@ -372,6 +454,7 @@
         if (seq !== connSeq) return;
         attachLocalVideo(room);
         updateControls();
+        refreshLiveDevices(room);
         if (micErr || camErr) {
           var what = micErr && camErr ? 'a câmera e o microfone' : (camErr ? 'a câmera' : 'o microfone');
           setWarn('Não consegui usar ' + what + '. Seus colegas não conseguem ' + (micErr && camErr ? 'ver nem ouvir você' : (camErr ? 'ver você' : 'ouvir você')) + '. Toque no cadeado ao lado do endereço, permita o acesso e use “Tentar de novo”.', true);
@@ -380,6 +463,32 @@
         }
       });
   }
+
+  function refreshLiveDevices(room) {
+    listDevices().then(function (l) {
+      if (!live || live.room !== room) return;
+      var cam = room.getActiveDevice ? room.getActiveDevice('videoinput') : null;
+      var mic = room.getActiveDevice ? room.getActiveDevice('audioinput') : null;
+      fillSelect($('l-cam-sel'), l.cams, cam, 'Câmera');
+      fillSelect($('l-mic-sel'), l.mics, mic, 'Microfone');
+      $('l-devs').hidden = !(l.cams.length > 1 || l.mics.length > 1);
+    });
+  }
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', function () { if (live) refreshLiveDevices(live.room); });
+  }
+  function switchDevice(kind, id) {
+    if (!live) return;
+    var p = loadPrefs();
+    if (kind === 'videoinput') p.cam = id; else p.mic = id;
+    savePrefs(p);
+    var room = live.room;
+    room.switchActiveDevice(kind, id).then(function () { setWarn(null); attachLocalVideo(room); updateControls(); }, function () {
+      setWarn('Não consegui trocar ' + (kind === 'videoinput' ? 'de câmera' : 'de microfone') + '. Escolha outra opção da lista.', false);
+    });
+  }
+  $('l-cam-sel').addEventListener('change', function () { switchDevice('videoinput', this.value); });
+  $('l-mic-sel').addEventListener('change', function () { switchDevice('audioinput', this.value); });
 
   function leaveLive() {
     connSeq++;

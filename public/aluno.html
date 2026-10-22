@@ -19,6 +19,15 @@
   .meter { height: 8px; width: 100%; max-width: 320px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
   .meter i { display: block; height: 100%; width: 0; background: var(--ok); transition: width 0.08s linear; }
 
+  .game { margin: 4px 0 14px; }
+  #game-canvas { display: block; width: 100%; max-width: 640px; aspect-ratio: 4 / 1; border: 1px solid var(--line); border-radius: 8px; touch-action: manipulation; cursor: pointer; }
+  .devrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; max-width: 640px; }
+  .devrow label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); min-width: 0; }
+  .devrow select { font: inherit; text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px; min-width: 0; width: 100%; }
+  .devs { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+  .devs summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  .devs .devrow { margin-top: 10px; }
+  @media (max-width: 560px) { .devrow { grid-template-columns: 1fr; } }
   .live-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .live-top h1 { font-size: 22px; font-weight: 600; }
   .timer { font-family: var(--font-mono); font-weight: 600; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -53,8 +62,16 @@
         <h1 id="w-head">Aguardando o professor iniciar a aula</h1>
         <p id="w-sub"></p>
         <p class="small" id="w-note"></p>
+        <div class="game" id="game">
+          <canvas id="game-canvas" aria-label="Joguinho: pule os lápis" role="img"></canvas>
+          <p class="small" id="game-score">Pontos: 0</p>
+        </div>
         <div class="check">
           <h2>Teste sua câmera e microfone</h2>
+          <div class="devrow" id="w-dev" hidden>
+            <label>Câmera <select id="w-cam"></select></label>
+            <label>Microfone <select id="w-mic"></select></label>
+          </div>
           <video id="w-video" muted playsinline hidden></video>
           <div class="meter" aria-hidden="true"><i id="w-meter"></i></div>
           <p class="small" id="w-status">Faça o teste agora para não perder tempo quando a aula começar.</p>
@@ -76,6 +93,13 @@
       <div class="status" id="l-status" role="status"></div>
       <div class="tiles" id="l-tiles"></div>
       <div id="l-audio" hidden></div>
+      <details class="devs" id="l-devs" hidden>
+        <summary>Trocar câmera ou microfone</summary>
+        <div class="devrow">
+          <label>Câmera <select id="l-cam-sel"></select></label>
+          <label>Microfone <select id="l-mic-sel"></select></label>
+        </div>
+      </details>
       <div class="controls">
         <button class="btn" id="l-mic" type="button"></button>
         <button class="btn" id="l-cam" type="button"></button>
@@ -88,6 +112,7 @@
 
   <script src="/vendor/livekit-client.umd.js"></script>
   <script src="/shared.js"></script>
+  <script src="/jogo.js"></script>
   <script src="/aluno.js"></script>
 </body>
 </html>
