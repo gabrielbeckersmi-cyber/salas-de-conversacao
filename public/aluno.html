@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="/shared.css">
 <style>
-  .wrap { max-width: 980px; margin: 0 auto; padding-top: 34px; display: flex; flex-direction: column; gap: 14px; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 44px 16px 40px; display: flex; flex-direction: column; gap: 20px; }
   .brand { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .netbar { background: var(--call-bg); color: var(--call); border: 1px solid var(--call-line); border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
   .card h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
@@ -39,31 +39,50 @@
   .devs summary { cursor: pointer; font-weight: 600; font-size: 14px; }
   .devs .devrow { margin-top: 10px; }
   @media (max-width: 560px) { .devrow { grid-template-columns: 1fr; } }
+  .tile.teacher { outline: 3px solid var(--call-line); outline-offset: -3px; }
+  .tile.teacher .nm { background: var(--primary); color: var(--on-primary); font-weight: 600; }
   .screen { background: #000; border-radius: 10px; overflow: hidden; border: 2px solid var(--primary); }
   .screen-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: var(--primary); color: var(--on-primary); font-weight: 600; font-size: 14px; }
+  .screen.expanded { position: fixed; inset: 0; z-index: 200; border-radius: 0; border: 0; display: flex; flex-direction: column; }
+  .screen.expanded .screen-head { padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top)); }
+  .screen.expanded .btn { min-height: 44px; font-size: 16px; }
+  .screen.expanded video { flex: 1; min-height: 0; max-height: none; height: 100%; }
+  body.noscroll { overflow: hidden; }
   .screen video { display: block; width: 100%; max-height: 62vh; background: #000; object-fit: contain; }
-  .chat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-  .chat h2 { font-size: 14px; font-weight: 600; }
-  .chat-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; min-height: 60px; overflow-y: auto; overscroll-behavior: contain; }
-  .chat-list .none { color: var(--ink-2); font-size: 13px; }
-  .cm { max-width: 92%; padding: 6px 10px; border-radius: 10px; background: var(--surface-2); font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; align-self: flex-start; }
-  .cm .who { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 1px; }
+  .chat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .chat-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 10px; }
+  .chat h2 { white-space: nowrap; }
+  .chat h2 { font-size: 16px; font-weight: 600; }
+  .chat-body { display: flex; flex-direction: column; gap: 12px; }
+  .chat-body[hidden] { display: none; }
+  .chat-list { display: flex; flex-direction: column; gap: 8px; height: 220px; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+  .chat-list .none { color: var(--ink-2); font-size: 14px; }
+  .cm { max-width: 92%; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; align-self: flex-start; }
+  .cm .who { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 2px; }
   .cm.me { align-self: flex-end; background: var(--inter-bg); }
   .cm.prof { align-self: stretch; max-width: 100%; background: var(--primary); color: var(--on-primary); border-left: 4px solid var(--call-line); }
   .cm.prof .who { color: inherit; opacity: 0.95; text-transform: uppercase; letter-spacing: 0.06em; }
-  .chat-form { display: flex; gap: 8px; }
+  .chat-form { display: flex; gap: 10px; }
   .chat-form .input { flex: 1; min-width: 0; }
+  .chat-new .chat-toggle { background: var(--live); border-color: var(--live); color: var(--on-live); animation: chatpulse 1.2s ease-in-out infinite; }
+  .chat.chat-new { border-color: var(--live); }
+  @keyframes chatpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192, 40, 31, 0.5); } 50% { box-shadow: 0 0 0 6px rgba(192, 40, 31, 0); } }
+  @media (prefers-reduced-motion: reduce) { .chat-new .chat-toggle { animation: none; } }
   .endmsg { white-space: pre-line; }
   .live-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .live-top h1 { font-size: 22px; font-weight: 600; }
   .timer { font-family: var(--font-mono); font-weight: 600; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 8px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 10px; }
   .tiles .avatar { width: 52px; height: 52px; font-size: 18px; }
   .tiles .tile .nm { font-size: 12px; }
   .tiles .tile.me { --lvl: var(--primary); }
-  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .call-big { min-height: 64px; font-size: 19px; font-family: var(--font-display); width: 100%; }
-  .banner { border-radius: 8px; padding: 9px 12px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  #live { display: flex; flex-direction: column; gap: 16px; }
+  #live[hidden] { display: none; }
+  .status:empty { display: none; }
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .controls .btn { min-height: 48px; padding: 8px 8px; gap: 6px; font-size: 15px; white-space: nowrap; }
+  .call-big { margin-top: 4px; min-height: 64px; font-size: 19px; font-family: var(--font-display); width: 100%; }
+  .banner { border-radius: 8px; padding: 12px 14px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
   .banner.talk { background: var(--live-bg); color: var(--live); }
   .banner.listen { background: var(--surface); border: 1px solid var(--line); }
   .status { font-size: 13px; color: var(--ink-2); min-height: 18px; }
@@ -126,14 +145,6 @@
         <video id="l-screen-video" autoplay playsinline muted></video>
       </div>
       <div class="tiles" id="l-tiles"></div>
-      <section class="chat" id="l-chat" aria-label="Chat da sala">
-        <h2>Chat da sala</h2>
-        <div class="chat-list" id="l-chat-list" role="log" aria-live="polite"></div>
-        <form class="chat-form" id="l-chat-form" autocomplete="off">
-          <input class="input" id="l-chat-in" maxlength="300" placeholder="Escreva para a sala…" aria-label="Mensagem para a sala">
-          <button class="btn btn-primary" type="submit">Enviar</button>
-        </form>
-      </section>
       <div id="l-audio" hidden></div>
       <details class="devs" id="l-devs" hidden>
         <summary>Trocar câmera ou microfone</summary>
@@ -149,6 +160,19 @@
       <button class="btn btn-sm" id="l-sound" type="button" hidden>Ativar o som da sala</button>
       <button class="btn btn-call call-big" id="l-call" type="button"></button>
       <button class="btn btn-sm" id="l-cancel" type="button" hidden>Cancelar chamado</button>
+      <section class="chat" id="l-chat" aria-label="Chat da sala">
+        <div class="chat-head">
+          <h2>Chat da sala</h2>
+          <button class="btn btn-sm chat-toggle" id="l-chat-toggle" type="button" aria-expanded="true">Esconder chat</button>
+        </div>
+        <div class="chat-body" id="l-chat-body">
+          <div class="chat-list" id="l-chat-list" role="log" aria-live="polite"></div>
+          <form class="chat-form" id="l-chat-form" autocomplete="off">
+            <input class="input" id="l-chat-in" maxlength="300" placeholder="Escreva para a sala…" aria-label="Mensagem para a sala">
+            <button class="btn btn-primary" type="submit">Enviar</button>
+          </form>
+        </div>
+      </section>
     </section>
   </main>
 

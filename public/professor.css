@@ -112,18 +112,25 @@
 .unread { background: var(--live); color: var(--on-live); border-radius: 999px; font-size: 12px; padding: 0 7px; margin-left: 6px; font-variant-numeric: tabular-nums; }
 .room-status { flex-wrap: wrap; }
 
-/* chat flutuante */
-.dock { position: fixed; right: 14px; bottom: 14px; width: min(380px, calc(100vw - 28px)); max-height: 70vh; z-index: 50; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.25); display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+/* chat flutuante (tamanho fixo) */
+.dock { position: fixed; right: 16px; bottom: 16px; width: min(400px, calc(100vw - 32px)); height: min(460px, 78vh); z-index: 50; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 34px rgba(0,0,0,0.28); display: flex; flex-direction: column; gap: 12px; padding: 14px; }
 .dock[hidden] { display: none; }
-.dock-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.chat-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; min-height: 120px; max-height: 40vh; overscroll-behavior: contain; }
-.chat-list .none { color: var(--ink-2); font-size: 13px; }
-.cm { max-width: 92%; padding: 6px 10px; border-radius: 10px; background: var(--surface-2); font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; align-self: flex-start; }
-.cm .who { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 1px; }
+.dock-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.dock-head b { font-size: 16px; }
+.dock .chat-list { flex: 1; min-height: 0; height: auto; }
+.chat-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overscroll-behavior: contain; }
+.chat-list .none { color: var(--ink-2); font-size: 14px; }
+.cm { max-width: 92%; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; align-self: flex-start; }
+.cm .who { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 2px; }
 .cm.prof { align-self: stretch; max-width: 100%; background: var(--primary); color: var(--on-primary); border-left: 4px solid var(--call-line); }
 .cm.prof .who { color: inherit; opacity: 0.95; text-transform: uppercase; letter-spacing: 0.06em; }
-.chat-form { display: flex; gap: 8px; }
+.chat-form { display: flex; gap: 10px; }
 .chat-form .input { flex: 1; min-width: 0; }
+.chatpill { position: fixed; right: 16px; bottom: 16px; z-index: 50; border: 0; border-radius: 999px; padding: 12px 20px; font: inherit; font-weight: 700; background: var(--live); color: var(--on-live); cursor: pointer; box-shadow: 0 6px 22px rgba(0,0,0,0.3); animation: chatpulse 1.2s ease-in-out infinite; }
+.chatpill[hidden] { display: none; }
+.unread { animation: chatpulse 1.2s ease-in-out infinite; }
+@keyframes chatpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192, 40, 31, 0.55); } 50% { box-shadow: 0 0 0 7px rgba(192, 40, 31, 0); } }
+@media (prefers-reduced-motion: reduce) { .chatpill, .unread { animation: none; } }
 
 /* mensagem final */
 .em { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-top: 14px; }
@@ -131,3 +138,27 @@
 .em-body { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-width: 640px; }
 .em-body textarea { resize: vertical; font: inherit; }
 .em-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+
+/* respiro entre os elementos */
+.app { gap: 20px; padding-bottom: 48px; }
+.topbar { padding: 18px 22px; gap: 16px 32px; }
+.statsrow { gap: 10px 20px; }
+.toolbar { gap: 10px 14px; }
+.hint { line-height: 1.5; max-width: 980px; }
+.calls { padding: 14px 18px; gap: 10px 16px; }
+.confirm { padding: 14px 18px; }
+.bcast { padding: 16px 18px; gap: 14px; margin-bottom: 0; }
+.bc-head { gap: 10px 14px; }
+.bc-actions { gap: 14px 28px; }
+.bc-group { gap: 8px 10px; }
+.bc-form { gap: 10px; }
+.board { gap: 18px; }
+.room { padding: 14px; gap: 12px; }
+.zone { padding: 14px; gap: 10px; }
+.tiles { gap: 8px; }
+.room-actions { gap: 8px; }
+.room-head { gap: 10px; }
+.plist { gap: 8px; }
+.em { padding: 14px 18px; margin-top: 8px; }
+.crow { padding: 16px 18px; gap: 12px; }
+.classes { gap: 14px; }

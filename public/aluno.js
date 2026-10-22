@@ -135,6 +135,8 @@
 
   // ---------- chat da sala ----------
   var chat = { roomId: null, list: [], ids: new Set() };
+  var chatOpen = true;
+  var chatUnread = 0;
   var chatListEl = $('l-chat-list');
   function chatNearBottom() { return chatListEl.scrollHeight - chatListEl.scrollTop - chatListEl.clientHeight < 60; }
   function chatHTML(m) {
@@ -146,17 +148,35 @@
     chatListEl.innerHTML = chat.list.length ? chat.list.map(chatHTML).join('') : '<p class="none">Nenhuma mensagem ainda.</p>';
     if (stick) chatListEl.scrollTop = chatListEl.scrollHeight;
   }
+  function paintChatToggle() {
+    var b = $('l-chat-toggle');
+    $('l-chat-body').hidden = !chatOpen;
+    b.setAttribute('aria-expanded', String(chatOpen));
+    b.textContent = chatOpen ? 'Esconder chat' : (chatUnread ? 'Mostrar chat · ' + chatUnread + (chatUnread === 1 ? ' nova' : ' novas') : 'Mostrar chat');
+    $('l-chat').classList.toggle('chat-new', !chatOpen && chatUnread > 0);
+  }
+  $('l-chat-toggle').addEventListener('click', function () {
+    chatOpen = !chatOpen;
+    if (chatOpen) { chatUnread = 0; }
+    paintChatToggle();
+    if (chatOpen) chatListEl.scrollTop = chatListEl.scrollHeight;
+  });
   function addChat(m) {
     if (chat.ids.has(m.id)) return;
     chat.ids.add(m.id);
     chat.list.push(m);
-    var stick = chatNearBottom() || (snap && m.pid === snap.me.pid);
+    var mine = snap && m.pid === snap.me.pid;
+    if (!chatOpen && !mine) { chatUnread++; paintChatToggle(); }
+    var stick = chatNearBottom() || mine;
     renderChat(stick);
   }
   function syncChat() {
-    var id = snap && snap.room ? snap.room.id : null;
+    // a chave inclui a rodada: na rodada 2 o chat começa vazio mesmo que o número da sala se repita
+    var id = snap && snap.room ? snap.round + ':' + snap.room.id : null;
     if (id === chat.roomId) return;
     chat = { roomId: id, list: [], ids: new Set() };
+    chatUnread = 0;
+    paintChatToggle();
     renderChat(true);
     if (!id || !session) return;
     A.api('GET', '/api/classes/' + encodeURIComponent(classId) + '/chat?studentId=' + encodeURIComponent(session.studentId)).then(function (r) {
@@ -179,6 +199,26 @@
     });
   });
 
+  // ---------- câmera do professor (aparece como um quadro a mais na sala) ----------
+  function showTeacherCam(track) {
+    var t = tiles.get('professor');
+    if (!t) {
+      var el = document.createElement('div');
+      el.className = 'tile teacher has-video';
+      el.innerHTML = '<span class="avatar">P</span><video autoplay playsinline></video><span class="nm">Professor</span>';
+      t = { el: el, video: el.querySelector('video') };
+      tiles.set('professor', t);
+      tilesEl.prepend(el);
+    }
+    track.attach(t.video);
+    t.el.classList.add('has-video');
+    var p = t.video.play(); if (p && p.catch) p.catch(function () { /* ignorar */ });
+  }
+  function hideTeacherCam() {
+    var t = tiles.get('professor');
+    if (t) { t.video.srcObject = null; t.el.remove(); tiles.delete('professor'); }
+  }
+
   // ---------- tela compartilhada pelo professor ----------
   var screenVideo = $('l-screen-video');
   function showScreen(track) {
@@ -187,14 +227,18 @@
     var p = screenVideo.play(); if (p && p.catch) p.catch(function () { /* ignorar */ });
   }
   function hideScreen() {
+    setExpanded(false);
     screenVideo.srcObject = null;
     $('l-screen').hidden = true;
   }
-  $('l-screen-fs').addEventListener('click', function () {
-    var el = $('l-screen');
-    var f = el.requestFullscreen || el.webkitRequestFullscreen;
-    if (f) f.call(el);
-  });
+  // "Tela cheia" própria (sem a tela cheia do navegador, que no celular pode travar): ocupa a janela toda e tem botão grande para fechar.
+  function setExpanded(on) {
+    $('l-screen').classList.toggle('expanded', on);
+    document.body.classList.toggle('noscroll', on);
+    $('l-screen-fs').textContent = on ? 'Fechar tela cheia' : 'Tela cheia';
+  }
+  $('l-screen-fs').addEventListener('click', function () { setExpanded(!$('l-screen').classList.contains('expanded')); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setExpanded(false); });
 
   function render() {
     $('title').textContent = snap.title;
@@ -422,7 +466,7 @@
   function syncTiles() {
     if (!snap || !snap.room) return;
     var want = new Set(snap.room.members.map(function (m) { return m.pid; }));
-    tiles.forEach(function (t, pid) { if (!want.has(pid)) { t.el.remove(); tiles.delete(pid); } });
+    tiles.forEach(function (t, pid) { if (pid !== 'professor' && !want.has(pid)) { t.el.remove(); tiles.delete(pid); } });
     snap.room.members.forEach(function (m) { getTile(m.pid, m.name); });
   }
   function clearTiles() {
@@ -473,7 +517,8 @@
       if (track.kind === 'audio') {
         audioBox.appendChild(track.attach());
       } else if (track.kind === 'video' && p.identity === 'professor') {
-        showScreen(track);
+        if (pub.source === LK.Track.Source.ScreenShare) showScreen(track);
+        else showTeacherCam(track);
       } else if (track.kind === 'video') {
         var t = getTile(p.identity, p.name);
         track.attach(t.video);
@@ -483,7 +528,10 @@
     });
     room.on(E.TrackUnsubscribed, function (track, pub, p) {
       track.detach().forEach(function (el) { if (el.tagName === 'AUDIO') el.remove(); });
-      if (track.kind === 'video' && p.identity === 'professor') { hideScreen(); return; }
+      if (track.kind === 'video' && p.identity === 'professor') {
+        if (pub.source === LK.Track.Source.ScreenShare) hideScreen(); else hideTeacherCam();
+        return;
+      }
       var t = tiles.get(p.identity);
       if (t && track.kind === 'video') t.el.classList.remove('has-video');
     });
