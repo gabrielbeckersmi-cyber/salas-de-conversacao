@@ -192,6 +192,7 @@ function build(env) {
 
   app.get('/', function (req, res) { res.sendFile(path.join(PUBLIC, 'index.html')); });
   app.get('/aula/:id', function (req, res) { res.sendFile(path.join(PUBLIC, 'aluno.html')); });
+  app.get('/aula', function (req, res) { res.sendFile(path.join(PUBLIC, 'aluno.html')); });
   app.get(['/professor', '/professor/:id'], function (req, res) { res.sendFile(path.join(PUBLIC, 'professor.html')); });
   app.use(express.static(PUBLIC, { index: false, maxAge: 0 }));
 

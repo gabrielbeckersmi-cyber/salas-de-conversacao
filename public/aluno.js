@@ -4,7 +4,20 @@
   var A = App;
   var LK = window.LivekitClient;
   var $ = function (id) { return document.getElementById(id); };
+  // O endereço com o código da aula some da barra assim que a página abre: quem copiar
+  // o endereço visível (/aula) não consegue entrar em outro aparelho.
   var classId = location.pathname.split('/').filter(Boolean)[1] || '';
+  var LAST = 'salas:last';
+  (function remember() {
+    var saved = false;
+    if (classId) {
+      try { localStorage.setItem(LAST, classId); saved = true; } catch (e) { /* ignorar */ }
+      try { sessionStorage.setItem(LAST, classId); saved = true; } catch (e) { /* ignorar */ }
+      if (saved) { try { history.replaceState(null, '', '/aula'); } catch (e) { /* ignorar */ } }
+    } else {
+      try { classId = sessionStorage.getItem(LAST) || localStorage.getItem(LAST) || ''; } catch (e) { classId = ''; }
+    }
+  })();
   var KEY = 'salas:' + classId;
   var screenEl = $('screen');
   var waitingEl = $('waiting');
@@ -583,7 +596,7 @@
 
   // ---------- início ----------
   function init() {
-    if (!classId) { screenMessage('Link inválido', 'Peça ao professor o link da aula.'); return; }
+    if (!classId) { screenMessage('Abra pelo link da aula', 'Use o link que o professor enviou (o botão ou a mensagem da aula). O endereço desta página não funciona se for copiado.'); return; }
     A.api('GET', '/api/classes/' + encodeURIComponent(classId) + '/public').then(function (info) {
       publicInfo = info;
       $('title').textContent = info.title;
