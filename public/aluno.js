@@ -31,7 +31,16 @@
   var conn = null;
 
   // ---------- telas simples ----------
+  // botão "Sair da aula": fica fixo no topo, ao lado do botão de tema
+  var leaveBtn = document.createElement('button');
+  leaveBtn.type = 'button';
+  leaveBtn.className = 'btn';
+  leaveBtn.id = 'leave-btn';
+  leaveBtn.textContent = 'Sair da aula';
+  leaveBtn.hidden = true;
+  A.topctl().insertBefore(leaveBtn, A.topctl().firstChild);
   function showOnly(which) {
+    leaveBtn.hidden = which === 'screen';
     screenEl.hidden = which !== 'screen';
     waitingEl.hidden = which !== 'waiting';
     liveEl.hidden = which !== 'live';
@@ -50,8 +59,7 @@
       '<button class="btn btn-primary" id="j-back" type="button">Voltar para a aula</button></div>');
     $('j-back').addEventListener('click', function () { openSession(); });
   }
-  $('l-leave').addEventListener('click', leaveClass);
-  $('w-leave').addEventListener('click', leaveClass);
+  leaveBtn.addEventListener('click', leaveClass);
 
   function screenEnd(em) {
     var text = em && em.text ? em.text : 'Obrigado por participar! Até a próxima.';

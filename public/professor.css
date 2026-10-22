@@ -168,3 +168,8 @@
 .dock { bottom: max(16px, env(safe-area-inset-bottom)); }
 .chatpill { bottom: max(16px, env(safe-area-inset-bottom)); }
 .app { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+
+/* aluno que saiu ou caiu: borda vermelha piscante */
+.tile.offline, .pchip.offline { box-shadow: inset 0 0 0 3px var(--live); animation: offblink 1s ease-in-out infinite; }
+@keyframes offblink { 0%, 100% { box-shadow: inset 0 0 0 3px var(--live); } 50% { box-shadow: inset 0 0 0 3px transparent; } }
+@media (prefers-reduced-motion: reduce) { .tile.offline, .pchip.offline { animation: none; } }

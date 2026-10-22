@@ -482,7 +482,7 @@
     return '<label class="mvw" title="Mover para outra sala">&#8644;<select class="mv" data-pid="' + s.pid + '" aria-label="Mover ' + esc(s.name) + ' para outra sala">' + opts + '</select></label>';
   }
   function chipHTML(s, roomId) {
-    return '<div class="pchip ' + A.LEVEL_CLS[s.level] + '" draggable="true" data-pid="' + s.pid + '">' +
+    return '<div class="pchip ' + A.LEVEL_CLS[s.level] + (s.online ? '' : ' offline') + '" draggable="true" data-pid="' + s.pid + '">' +
       '<span class="avatar">' + esc(A.initials(s.name)) + '</span>' +
       '<span class="pn" title="' + esc(s.name) + ' (' + A.LEVEL_NAME[s.level] + ')">' + esc(s.name) + '</span>' +
       '<span class="st ' + (s.online ? 'on' : 'off') + '" title="' + (s.online ? 'online' : 'offline') + '"></span>' +
@@ -491,7 +491,7 @@
       '</div>';
   }
   function tileHTML(r, s) {
-    return '<div class="tile ' + A.LEVEL_CLS[s.level] + '" draggable="true" data-pid="' + s.pid + '" data-room="' + r.id + '">' +
+    return '<div class="tile ' + A.LEVEL_CLS[s.level] + (s.online ? '' : ' offline') + '" draggable="true" data-pid="' + s.pid + '" data-room="' + r.id + '">' +
       '<span class="avatar">' + esc(A.initials(s.name)) + '</span>' +
       '<span class="slot" data-room="' + r.id + '" data-pid="' + s.pid + '"></span>' +
       '<span class="nm" title="' + esc(s.name) + '">' + esc(s.name) + (s.online ? '' : ' (offline)') + '</span>' +

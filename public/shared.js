@@ -116,9 +116,14 @@ window.App = (function () {
       document.dispatchEvent(new CustomEvent('themechange'));
     });
     paint();
-    document.body.appendChild(btn);
+    topctl().appendChild(btn);
+  }
+  var topEl = null;
+  function topctl() {
+    if (!topEl) { topEl = document.createElement('div'); topEl.className = 'topctl'; document.body.appendChild(topEl); }
+    return topEl;
   }
   initTheme();
 
-  return { LEVEL_NAME: LEVEL_NAME, LEVEL_CLS: LEVEL_CLS, ICON: ICON, esc: esc, initials: initials, mmss: mmss, api: api, connectWS: connectWS, copyText: copyText };
+  return { LEVEL_NAME: LEVEL_NAME, LEVEL_CLS: LEVEL_CLS, ICON: ICON, esc: esc, initials: initials, mmss: mmss, api: api, connectWS: connectWS, copyText: copyText, topctl: topctl };
 })();
