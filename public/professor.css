@@ -162,3 +162,9 @@
 .em { padding: 14px 18px; margin-top: 8px; }
 .crow { padding: 16px 18px; gap: 12px; }
 .classes { gap: 14px; }
+
+.em select.input { appearance: auto; }
+.prev { width: 100%; max-width: 320px; aspect-ratio: 4 / 3; border-radius: 10px; background: #000; object-fit: cover; transform: scaleX(-1); }
+.dock { bottom: max(16px, env(safe-area-inset-bottom)); }
+.chatpill { bottom: max(16px, env(safe-area-inset-bottom)); }
+.app { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }

@@ -313,7 +313,7 @@ function build(env) {
       case 'answer': C.answerCall(c, b.roomId); break;
       case 'bmic': C.setBroadcastMic(c, b.roomIds); break;
       case 'end-message': C.setEndMessage(c, b); break;
-      case 'chat': C.teacherSay(c, b.roomIds, b.text).forEach(function (x) { sendChat(c, x.roomId, x.msg); }); break;
+      case 'chat': C.teacherSay(c, b.roomIds, b.text, b.name).forEach(function (x) { sendChat(c, x.roomId, x.msg); }); break;
       case 'kick': { const s = C.kick(c, b.pid); disconnectStudent(c, s.id); break; }
       default: throw new C.AppError(400, 'action', 'Ação desconhecida.');
     }

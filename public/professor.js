@@ -13,6 +13,51 @@
   var parts = location.pathname.split('/').filter(Boolean);
   var classId = parts[1] || null;
 
+  var NAME_KEY = 'salas:profname';
+  var DEV_KEY = 'salas:profdev';
+  var profName = '';
+  try { profName = localStorage.getItem(NAME_KEY) || ''; } catch (e) { profName = ''; }
+  function saveName(n) {
+    profName = String(n || '').replace(/\s+/g, ' ').trim().slice(0, 30);
+    try { localStorage.setItem(NAME_KEY, profName); } catch (e) { /* ignorar */ }
+  }
+
+  // ---------- escolha de câmera e microfone (a escolha fica salva neste navegador) ----------
+  var VIRTUAL = /obs|virtual|manycam|snap camera|xsplit|droidcam|epoccam|ndi|streamlabs/i;
+  function loadDev() { try { return JSON.parse(localStorage.getItem(DEV_KEY)) || {}; } catch (e) { return {}; } }
+  function saveDev(p) { try { localStorage.setItem(DEV_KEY, JSON.stringify(p)); } catch (e) { /* ignorar */ } }
+  function listDevices() {
+    var none = { cams: [], mics: [] };
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return Promise.resolve(none);
+    return navigator.mediaDevices.enumerateDevices().then(function (ds) {
+      return {
+        cams: ds.filter(function (d) { return d.kind === 'videoinput' && d.deviceId; }),
+        mics: ds.filter(function (d) { return d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'communications'; })
+      };
+    }, function () { return none; });
+  }
+  function realCam(list) {
+    var real = list.filter(function (d) { return !VIRTUAL.test(d.label); });
+    return real.length && real.length < list.length ? real[0] : null;
+  }
+  // câmera a usar: a escolhida pelo professor; sem escolha, evita câmera virtual (OBS etc.)
+  async function resolveCam() {
+    var p = loadDev();
+    var l = await listDevices();
+    if (p.cam && l.cams.some(function (d) { return d.deviceId === p.cam; })) return p.cam;
+    if (!l.cams.some(function (d) { return d.label; })) {
+      try { var s = await navigator.mediaDevices.getUserMedia({ video: true }); s.getTracks().forEach(function (t) { t.stop(); }); l = await listDevices(); } catch (e) { /* ignorar */ }
+    }
+    var rc = realCam(l.cams);
+    return rc ? rc.deviceId : undefined;
+  }
+  async function resolveMic() {
+    var p = loadDev();
+    if (!p.mic) return undefined;
+    var l = await listDevices();
+    return l.mics.some(function (d) { return d.deviceId === p.mic; }) ? p.mic : undefined;
+  }
+
   var S = null;            // última foto da aula enviada pelo servidor
   var offset = 0;          // diferença entre o relógio do servidor e o deste computador
   var ws = null;
@@ -49,6 +94,7 @@
     app.innerHTML = '<form class="card narrow" id="login" novalidate>' +
       '<h1>Painel do professor</h1><p>Digite a senha para continuar.</p>' +
       (msg ? '<div class="msg info">' + esc(msg) + '</div>' : '') +
+      '<div class="field"><label class="lbl" for="pname">Seu nome (aparece nas mensagens do chat)</label><input class="input" id="pname" maxlength="30" autocomplete="given-name" value="' + esc(profName) + '" placeholder="Ex.: Gabriel"></div>' +
       '<div class="field"><label class="lbl" for="pw">Senha</label><input class="input" id="pw" type="password" autocomplete="current-password" required></div>' +
       '<div class="msg err" id="lerr" role="alert" hidden></div>' +
       '<button class="btn btn-primary" type="submit">Entrar</button></form>';
@@ -56,12 +102,13 @@
       e.preventDefault();
       $('lerr').hidden = true;
       A.api('POST', '/api/professor/login', { password: $('pw').value }).then(function (r) {
+        saveName($('pname').value);
         token = r.token;
         try { localStorage.setItem(TOKEN_KEY, token); } catch (e2) { /* ignorar */ }
         boot();
       }, function (ex) { $('lerr').textContent = ex.message; $('lerr').hidden = false; });
     });
-    setTimeout(function () { var p = $('pw'); if (p) p.focus(); }, 50);
+    setTimeout(function () { var p = $(profName ? 'pw' : 'pname'); if (p) p.focus(); }, 50);
   }
 
   // ======================================================== lista de aulas
@@ -73,6 +120,7 @@
       var d = new Date();
       var def = 'Aula de conversação · ' + String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
       app.innerHTML = '<div class="topbar"><div><h1>Salas de Conversação</h1><p class="sub">Painel do professor</p></div><button class="btn btn-sm" data-act="logout" type="button">Sair</button></div>' +
+        '<div id="set-slot"></div>' +
         (r.livekit ? '' : '<div class="msg err">O servidor ainda não tem o LiveKit configurado (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET). Sem isso a aula não consegue começar.</div>') +
         '<form class="card" id="new-class" novalidate><h2>Nova aula</h2>' +
         '<p class="small">Cada aula tem um link só dela. Poste o link da aula de quinta para os alunos de quinta, o da sexta para os de sexta.</p>' +
@@ -81,6 +129,7 @@
         '<div class="msg err" id="c-err" role="alert" hidden></div>' +
         '<div><button class="btn btn-primary" type="submit">Criar aula e gerar link</button></div></form>' +
         '<div class="classes">' + (r.classes.length ? r.classes.map(classRow).join('') : '<p class="empty">Nenhuma aula criada ainda.</p>') + '</div>';
+      mountSettings();
       $('new-class').addEventListener('submit', function (e) {
         e.preventDefault();
         T('POST', '/api/professor/classes', { title: $('c-title').value, roundMinutes: Number($('c-min').value) || 15 })
@@ -287,10 +336,14 @@
     setTalking(on) {
       var self = this;
       this.talking = on;
-      this.chain = this.chain.then(function () {
+      this.chain = this.chain.then(async function () {
         if (!self.connected) return null;
         var lp = self.room.localParticipant;
-        if (on) return lp.setMicrophoneEnabled(true);
+        if (on) {
+          var mid = await resolveMic();
+          try { return await lp.setMicrophoneEnabled(true, mid ? { deviceId: mid } : undefined); }
+          catch (e) { if (mid) return lp.setMicrophoneEnabled(true); throw e; }
+        }
         var pub = lp.getTrackPublication(LK.Track.Source.Microphone);
         return pub && pub.track ? lp.unpublishTrack(pub.track, true) : null;
       }).catch(function () {
@@ -300,9 +353,13 @@
     setCam(on) {
       var self = this;
       this.camOn = on;
-      this.chain = this.chain.then(function () {
+      this.chain = this.chain.then(async function () {
         if (!self.connected) return null;
-        return self.room.localParticipant.setCameraEnabled(on);
+        var lp = self.room.localParticipant;
+        if (!on) return lp.setCameraEnabled(false);
+        var id = await resolveCam();
+        try { return await lp.setCameraEnabled(true, id ? { deviceId: id } : undefined); }
+        catch (e) { if (id) return lp.setCameraEnabled(true); throw e; }
       }).catch(function () {
         if (on) { ui.camRoom = null; ui.warn = 'Não consegui usar a sua câmera. Libere a permissão do navegador (cadeado ao lado do endereço) e tente de novo.'; syncViews(); applyHear(); render(); }
       });
@@ -557,6 +614,7 @@
       h += '<p class="hint">As salas começam só com as iniciais. “Ver vídeo” mostra o vídeo da sala escolhida (e passa a consumir dados do LiveKit só dela). “Ouvir” liga o áudio só da sala escolhida. “Falar” abre o seu microfone só para ela. Use fones de ouvido para evitar eco.</p>';
     }
 
+    h += '<div id="set-slot"></div>';
     if (live) h += '<div id="bc-slot"></div>';
     h += '<div class="board">';
     if (planning || unassigned.length) {
@@ -579,6 +637,7 @@
     if (bslot) { ensureBc(); renderBcTop(); bslot.appendChild(bcEl); }
     var eslot = $('em-slot');
     if (eslot) { ensureEm(); eslot.appendChild(emEl); }
+    mountSettings();
     if (ui.keep) {
       var k = $(ui.keep.id);
       if (k) { try { k.focus({ preventScroll: true }); if (k.setSelectionRange && ui.keep.s != null) k.setSelectionRange(ui.keep.s, ui.keep.e); } catch (e) { /* ignorar */ } }
@@ -586,6 +645,80 @@
     }
     renderPill();
     tick();
+  }
+
+  // ---------- meu nome, câmera e microfone ----------
+  var setEl = null;
+  var prevStream = null;
+  function ensureSettings() {
+    if (setEl) return;
+    setEl = document.createElement('details');
+    setEl.className = 'em';
+    setEl.innerHTML = '<summary>Meu nome, câmera e microfone</summary><div class="em-body">' +
+      '<label class="lbl-t" for="set-name">Seu nome (aparece nas mensagens do chat)</label><input class="input" id="set-name" maxlength="30" placeholder="Ex.: Gabriel">' +
+      '<label class="lbl-t" for="set-cam">Câmera que aparece para os alunos</label><select class="input" id="set-cam"></select>' +
+      '<label class="lbl-t" for="set-mic">Microfone</label><select class="input" id="set-mic"></select>' +
+      '<video id="set-prev" class="prev" muted playsinline hidden></video>' +
+      '<p class="small" id="set-hint">Ao abrir esta seção, o navegador pede permissão e mostra a sua câmera. A escolha fica salva neste navegador.</p></div>';
+    setEl.querySelector('#set-name').value = profName;
+    setEl.querySelector('#set-name').addEventListener('change', function () { saveName(this.value); this.value = profName; });
+    setEl.addEventListener('toggle', function () { if (setEl.open) startPrev(); else stopPrev(); });
+    setEl.querySelector('#set-cam').addEventListener('change', function () {
+      var p = loadDev(); p.cam = this.value; saveDev(p);
+      views.forEach(function (v) { if (v.camOn && v.connected) v.room.switchActiveDevice('videoinput', p.cam).catch(function () { /* ignorar */ }); });
+      startPrev();
+    });
+    setEl.querySelector('#set-mic').addEventListener('change', function () {
+      var p = loadDev(); p.mic = this.value; saveDev(p);
+      views.forEach(function (v) { if (v.talking && v.connected) v.room.switchActiveDevice('audioinput', p.mic).catch(function () { /* ignorar */ }); });
+    });
+  }
+  function mountSettings() {
+    var slot = $('set-slot');
+    if (!slot) return;
+    ensureSettings();
+    if (setEl.parentNode !== slot) slot.appendChild(setEl);
+  }
+  function stopPrev() {
+    if (prevStream) { prevStream.getTracks().forEach(function (t) { t.stop(); }); prevStream = null; }
+    var v = setEl && setEl.querySelector('#set-prev');
+    if (v) { v.srcObject = null; v.hidden = true; }
+  }
+  function fillSel(sel, list, current, label) {
+    sel.innerHTML = '';
+    list.forEach(function (d, i) {
+      var o = document.createElement('option');
+      o.value = d.deviceId; o.textContent = d.label || (label + ' ' + (i + 1));
+      if (d.deviceId === current) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.disabled = !list.length;
+  }
+  async function startPrev() {
+    stopPrev();
+    var hint = setEl.querySelector('#set-hint');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { hint.textContent = 'Este navegador não permite usar a câmera aqui.'; return; }
+    try {
+      var camId = await resolveCam();
+      var micId = await resolveMic();
+      var stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: camId ? { deviceId: { exact: camId } } : true, audio: micId ? { deviceId: { exact: micId } } : true });
+      } catch (e) { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true }); }
+      if (!setEl.open) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+      prevStream = stream;
+      var v = setEl.querySelector('#set-prev');
+      v.srcObject = stream; v.hidden = false;
+      v.play().catch(function () { /* ignorar */ });
+      var l = await listDevices();
+      var cur = stream.getVideoTracks()[0] && stream.getVideoTracks()[0].getSettings().deviceId;
+      var curMic = stream.getAudioTracks()[0] && stream.getAudioTracks()[0].getSettings().deviceId;
+      fillSel(setEl.querySelector('#set-cam'), l.cams, cur, 'Câmera');
+      fillSel(setEl.querySelector('#set-mic'), l.mics, curMic, 'Microfone');
+      hint.textContent = 'Esta é a câmera que os alunos verão. Escolha outra na lista se não for a certa; a escolha fica salva.';
+    } catch (e) {
+      hint.textContent = 'Não consegui acessar a câmera. Libere a permissão no cadeado ao lado do endereço e abra esta seção de novo.';
+    }
   }
 
   // ---------- painel de transmissão (selecionar salas, microfone, tela, mensagem) ----------
@@ -626,7 +759,7 @@
     var ids = mode === 'all' ? 'all' : selectedIds();
     if (mode !== 'all' && !ids.length) return;
     inp.value = '';
-    act({ action: 'chat', roomIds: ids, text: text });
+    act({ action: 'chat', roomIds: ids, text: text, name: profName });
   }
   function startShare(ids) {
     if (!ids.length) return;
@@ -695,11 +828,11 @@
       var text = inp.value.trim();
       if (!text || !ui.chatRoom) return;
       inp.value = '';
-      act({ action: 'chat', roomIds: [ui.chatRoom], text: text });
+      act({ action: 'chat', roomIds: [ui.chatRoom], text: text, name: profName });
     });
   }
   function chatMsgHTML(m) {
-    if (m.from === 'professor') return '<div class="cm prof"><span class="who">Professor</span>' + esc(m.text) + '</div>';
+    if (m.from === 'professor') return '<div class="cm prof"><span class="who">Professor' + (m.name && m.name !== 'Professor' ? ' · ' + esc(m.name) : '') + '</span>' + esc(m.text) + '</div>';
     return '<div class="cm"><span class="who">' + esc(m.name) + '</span>' + esc(m.text) + '</div>';
   }
   function renderDock(stick) {
@@ -862,6 +995,7 @@
     if (a === 'answer') {
       startAudioAll();
       S.students.forEach(function (s) { var r = S.rooms.find(function (x) { return x.id === room; }); if (r && r.members.indexOf(s.pid) !== -1) s.callAt = null; });
+      ui.camRoom = room;                       // ao atender, o professor também aparece na câmera da sala
       setHear({ roomId: room, mode: 'talk' });
       act({ action: 'answer', roomId: room });
     }

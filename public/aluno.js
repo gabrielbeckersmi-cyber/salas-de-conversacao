@@ -41,6 +41,18 @@
     say('<div class="card join"><h1>' + A.esc(title) + '</h1><p>' + A.esc(text) + '</p></div>');
   }
 
+  // ---------- sair e voltar ----------
+  function leaveClass() {
+    if (conn) { conn.close(); conn = null; }
+    leaveLive(); stopCheck(); window.Jogo.stop();
+    snap = null;
+    say('<div class="card join"><h1>Você saiu da aula</h1><p>Quando quiser, volte para a aula. Você entra na mesma sala em que estava.</p>' +
+      '<button class="btn btn-primary" id="j-back" type="button">Voltar para a aula</button></div>');
+    $('j-back').addEventListener('click', function () { openSession(); });
+  }
+  $('l-leave').addEventListener('click', leaveClass);
+  $('w-leave').addEventListener('click', leaveClass);
+
   function screenEnd(em) {
     var text = em && em.text ? em.text : 'Obrigado por participar! Até a próxima.';
     var btn = '';
@@ -141,7 +153,7 @@
   function chatNearBottom() { return chatListEl.scrollHeight - chatListEl.scrollTop - chatListEl.clientHeight < 60; }
   function chatHTML(m) {
     var mine = snap && snap.me && m.pid === snap.me.pid;
-    if (m.from === 'professor') return '<div class="cm prof"><span class="who">Professor</span>' + A.esc(m.text) + '</div>';
+    if (m.from === 'professor') return '<div class="cm prof"><span class="who">Professor' + (m.name && m.name !== 'Professor' ? ' · ' + A.esc(m.name) : '') + '</span>' + A.esc(m.text) + '</div>';
     return '<div class="cm' + (mine ? ' me' : '') + '"><span class="who">' + A.esc(mine ? 'Você' : m.name) + '</span>' + A.esc(m.text) + '</div>';
   }
   function renderChat(stick) {
@@ -186,6 +198,7 @@
       renderChat(true);
     }, function () { /* ignorar */ });
   }
+  $('l-chat-in').addEventListener('focus', function () { var el = this; setTimeout(function () { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { /* ignorar */ } }, 350); });
   $('l-chat-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var inp = $('l-chat-in');
