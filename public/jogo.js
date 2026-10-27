@@ -96,7 +96,11 @@
     var sc = Math.floor(st.dist / 10);
     ctx.fillText((hi ? 'HI ' + String(hi).padStart(5, '0') + '   ' : '') + String(sc).padStart(5, '0'), W - 12, 26);
     ctx.textAlign = 'center';
-    if (st.hint) ctx.fillText('Toque ou aperte espaço para pular', W / 2, 58);
+    if (st.hint) {
+      ctx.font = '600 16px ui-sans-serif, system-ui, sans-serif';
+      ctx.fillText('A aula começará em breve, enquanto espera,', W / 2, 54);
+      ctx.fillText('toque ou aperte espaço para pular.', W / 2, 76);
+    }
     if (st.over) { ctx.fillStyle = col.ink; ctx.font = '700 24px ui-sans-serif, system-ui, sans-serif'; ctx.fillText('Fim de jogo. Toque para jogar de novo', W / 2, 70); }
     if (scoreEl) scoreEl.textContent = 'Pontos: ' + sc + (hi ? ' · Recorde: ' + hi : '');
   }

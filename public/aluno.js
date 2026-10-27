@@ -357,9 +357,9 @@
     try { never = localStorage.getItem(TUT_KEY) === '1'; } catch (e) { never = false; }
     if (never) return;
     tutShown = true;
-    var url = isPhone() ? 'https://hotm.io/tutorialconversacaocelular' : 'https://hotm.io/tutorialconversacaopc';
+    var url = 'https://www.youtube.com/embed/QZZkQd8JQxY?rel=0&playsinline=1';
     $('tut-frame').src = url;
-    $('tut-link').href = url;
+    $('tut-link').href = 'https://youtube.com/shorts/QZZkQd8JQxY';
     $('tut').hidden = false;
   }
   $('tut-close').addEventListener('click', function () {

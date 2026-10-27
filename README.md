@@ -51,3 +51,11 @@ Abra http://localhost:3000/professor. Câmera/microfone funcionam em `localhost`
 ## Observações
 - Cada sala de alunos é uma sala LiveKit própria; o professor só se conecta às salas em que clicou em Ver vídeo, Ouvir ou Falar, então só essas consomem minutos de participante extra no LiveKit.
 - Se houver poucos alunos de um nível, o sistema usa salas de 3 para evitar repetir parceiros; se não der, mostra quantos pares repetiram.
+
+## Novidades desta versão
+
+- **Temas sugeridos**: lidos do Firebase (`temaEscolhido1` e `temaEscolhido2`) e mostrados acima do jogo e no painel do professor. A leitura é feita pelo servidor (variável opcional `FIREBASE_DB_URL`). As regras do Realtime Database precisam permitir leitura pública desses dois campos.
+- **Permitir alunos**: botão no painel do professor (depois que a aula começa). Ligado, alunos atrasados entram em "Sem sala" até você colocá-los em uma sala.
+- **Tutorial em vídeo** na sala de espera da 1ª rodada (celular e computador), com "não ver novamente".
+- **Saída instantânea**: fechar a página ou clicar em Sair marca o aluno offline na hora no painel.
+- Em computador, a sala ao vivo do aluno mostra vídeos à esquerda e botões + chat à direita, sem rolagem. No celular nada mudou.
