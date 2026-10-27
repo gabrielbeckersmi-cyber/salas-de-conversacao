@@ -280,18 +280,20 @@
     var running = snap.phase === 'r1' || snap.phase === 'r2';
     if (snap.phase === 'done') {
       leaveLive(); stopCheck(); window.Jogo.stop();
+      closeTutorial();
       screenEnd(snap.endMessage);
       return;
     }
     if (running && snap.room) {
       stopCheck(); window.Jogo.stop();
-      resetTutorial(); $('tut').hidden = true;
+      resetTutorial(); closeTutorial();
       showOnly('live');
       updateLive();
       connectLive(snap.room.lk, snap.room.lkError);
       return;
     }
     leaveLive();
+    if (snap.phase !== 'lobby') closeTutorial();
     showOnly('waiting');
     updateWaiting(running);
     window.Jogo.start();
@@ -362,10 +364,13 @@
     $('tut-link').href = 'https://youtube.com/shorts/QZZkQd8JQxY';
     $('tut').hidden = false;
   }
+  function closeTutorial() {
+    $('tut').hidden = true;
+    $('tut-frame').src = 'about:blank'; // descarrega o player: o vídeo e o áudio param
+  }
   $('tut-close').addEventListener('click', function () {
     if ($('tut-never').checked) { try { localStorage.setItem(TUT_KEY, '1'); } catch (e) { /* ignorar */ } }
-    $('tut').hidden = true;
-    $('tut-frame').src = 'about:blank'; // para o vídeo
+    closeTutorial();
   });
   // tutShown volta a falso quando o aluno sai da sala de espera da 1ª rodada, para aparecer na próxima entrada
   function resetTutorial() { tutShown = false; }
