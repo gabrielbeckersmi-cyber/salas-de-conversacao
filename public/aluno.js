@@ -218,7 +218,6 @@
     if (t === 'chat') chatUnread = 0; else if (t === 'tr') trSeen = true; else dynSeen = true;
     paintChatToggle();
     if (t === 'chat') chatListEl.scrollTop = chatListEl.scrollHeight;
-    else if (t === 'tr') setTimeout(function () { try { $('tr-in').focus({ preventScroll: true }); } catch (e) { /* ignorar */ } }, 30);
   }
   $('tab-chat').addEventListener('click', function () { setTab('chat'); });
   $('tab-tr').addEventListener('click', function () { setTab('tr'); });
@@ -1230,7 +1229,6 @@
     out.textContent = '';
     out.classList.remove('err');
     trPaint();
-    $('tr-in').focus();
   });
   $('pane-tr').addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('[data-tr]') : null;

@@ -68,6 +68,8 @@
   var ui = {
     n: null, confirm: null, warn: '', net: false, watch: new Set(),
     camRooms: new Set(),     // salas em que o professor aparece na câmera (pode ser várias ao mesmo tempo)
+    joined: new Set(),       // salas em que o professor está "dentro" (entrou pelo botão Entrar na sala)
+    kickPid: null,
     lobbyOn: false, lobbyWatch: false, lobbyListen: true, lobbyTalk: false, lobbyCam: false,   // sala de espera
     sel: new Set(),          // salas escolhidas para transmissão (microfone, tela, mensagem)
     share: null,             // { stream, rooms:Set } quando a tela está sendo compartilhada
@@ -181,9 +183,10 @@
       if (lobbyChat) ui.chat.lobby = lobbyChat;
       if (lobbyUnread) ui.unread.lobby = lobbyUnread;
     }
-    if (!isLive()) { if (ui.share) stopShareQuiet(); if (ui.chatRoom !== 'lobby') ui.chatRoom = null; ui.camRooms.clear(); ui.sel.clear(); }
+    if (!isLive()) { if (ui.share) stopShareQuiet(); if (ui.chatRoom !== 'lobby') ui.chatRoom = null; ui.camRooms.clear(); ui.sel.clear(); ui.joined.clear(); }
     if (S.phase === 'done') { ui.lobbyOn = false; ui.chatRoom = null; }
     ui.camRooms.forEach(function (id) { if (!S.rooms.some(function (r) { return r.id === id; })) ui.camRooms.delete(id); });
+    ui.joined.forEach(function (id) { if (!S.rooms.some(function (r) { return r.id === id; })) ui.joined.delete(id); });
     var ids = new Set(S.rooms.map(function (r) { return r.id; }));
     ui.sel.forEach(function (id) { if (!ids.has(id)) ui.sel.delete(id); });
     if (ui.share) { ui.share.rooms.forEach(function (id) { if (!ids.has(id)) ui.share.rooms.delete(id); }); if (!ui.share.rooms.size) stopShareQuiet(); }
@@ -206,6 +209,7 @@
     }
   }
   function paintTile(view, pid) {
+    if (pid === '__me') return;
     var t = document.querySelector('.tile[data-room="' + view.id + '"][data-pid="' + pid + '"]');
     if (!t) return;
     t.classList.toggle('has-video', view.videoOn.has(pid));
@@ -215,6 +219,25 @@
   }
   function paintAll(view) {
     document.querySelectorAll('.tile[data-room="' + view.id + '"]').forEach(function (t) { paintTile(view, t.getAttribute('data-pid')); });
+  }
+
+  // Prévia da sua própria câmera dentro da sala (espelhada), para você ver o que os alunos veem
+  var selfVids = new Map();
+  function selfTileHTML(roomId) {
+    return '<div class="tile me lv-misto" data-pid="__me" data-room="' + roomId + '"><span class="avatar">V</span><span class="slot" data-self="1" data-room="' + roomId + '"></span><span class="nm">Você</span></div>';
+  }
+  function mountSelf() {
+    var seen = new Set();
+    document.querySelectorAll('.slot[data-self]').forEach(function (slot) {
+      var id = slot.getAttribute('data-room');
+      seen.add(id);
+      var v = selfVids.get(id);
+      if (!v) { v = document.createElement('video'); v.muted = true; v.autoplay = true; v.playsInline = true; selfVids.set(id, v); }
+      if (camShared.stream && v.srcObject !== camShared.stream) v.srcObject = camShared.stream;
+      if (v.parentNode !== slot) slot.appendChild(v);
+      if (camShared.stream) { slot.parentNode.classList.add('has-video'); var pp = v.play(); if (pp && pp.catch) pp.catch(function () { /* ignorar */ }); }
+    });
+    selfVids.forEach(function (v, id) { if (!seen.has(id)) { v.srcObject = null; v.remove(); selfVids.delete(id); } });
   }
 
   // problemas de conexão do professor (entram no relatório)
@@ -414,6 +437,7 @@
         }
         if (!on) { releaseCamIfUnused(); return null; }
         var stream = await acquireCam();
+        mountSelf();
         var src = stream.getVideoTracks()[0];
         var lt = new LK.LocalVideoTrack(src.clone(), undefined, true);
         await lp.publishTrack(lt, { source: LK.Track.Source.Camera, name: 'camera', simulcast: false, videoEncoding: { maxBitrate: 450000, maxFramerate: 24 } });
@@ -559,7 +583,7 @@
       '<span class="pn" title="' + esc(s.name) + ' (' + A.LEVEL_NAME[s.level] + ')">' + esc(s.name) + '</span>' +
       '<span class="st ' + (s.online ? 'on' : 'off') + '" title="' + (s.online ? 'online' : 'offline') + '"></span>' +
       mvSelect(s, roomId) +
-      (s.online ? '' : '<button class="kick" data-act="kick" data-pid="' + s.pid + '" title="Remover aluno" aria-label="Remover ' + esc(s.name) + '" type="button">&times;</button>') +
+      '<button class="kick" data-act="ask-kick" data-pid="' + s.pid + '" title="Excluir da aula" aria-label="Excluir ' + esc(s.name) + ' da aula" type="button">&times;</button>' +
       '</div>';
   }
   function tileHTML(r, s) {
@@ -568,7 +592,8 @@
       '<span class="slot" data-room="' + r.id + '" data-pid="' + s.pid + '"></span>' +
       '<span class="nm" title="' + esc(s.name) + '">' + esc(s.name) + (s.online ? '' : ' (offline)') + '</span>' +
       '<span class="micoff">' + A.ICON.micoff + '</span>' +
-      mvSelect(s, r.id) + '</div>';
+      mvSelect(s, r.id) +
+      '<button class="kick tilekick" data-act="ask-kick" data-pid="' + s.pid + '" title="Excluir da aula" aria-label="Excluir ' + esc(s.name) + ' da aula" type="button">&times;</button></div>';
   }
 
   function roomHTML(r, by) {
@@ -581,7 +606,8 @@
     var bcast = (S.bmic || []).indexOf(r.id) !== -1;
     var sharing = !!ui.share && ui.share.rooms.has(r.id);
     var body;
-    if (live) body = members.length ? '<div class="tiles">' + members.map(function (s) { return tileHTML(r, s); }).join('') + '</div>' : '<p class="empty">Sala vazia. Arraste alguém para cá.</p>';
+    var selfTile = ui.camRooms.has(r.id) ? selfTileHTML(r.id) : '';
+    if (live) body = (members.length || selfTile) ? '<div class="tiles">' + selfTile + members.map(function (s) { return tileHTML(r, s); }).join('') + '</div>' : '<p class="empty">Sala vazia. Arraste alguém para cá.</p>';
     else body = '<div class="plist">' + (members.length ? members.map(function (s) { return chipHTML(s, r.id); }).join('') : '<span class="empty">Sala vazia. Arraste alguém para cá.</span>') + '</div>';
     var status = '';
     var actions = '';
@@ -593,17 +619,24 @@
       if (sharing) status += '<span class="tag share">' + A.ICON.screen + 'Tela compartilhada</span>';
       if (ui.camRooms.has(r.id)) status += '<span class="tag live">' + A.ICON.cam + 'Você está na câmera</span>';
       var un = ui.unread[r.id] || 0;
-      actions = '<div class="room-actions">' +
-        '<button class="btn wide" data-act="watch" data-room="' + r.id + '" aria-pressed="' + ui.watch.has(r.id) + '" type="button">' + A.ICON.cam + (ui.watch.has(r.id) ? 'Parar de ver vídeo' : 'Ver vídeo') + '</button>' +
-        '<button class="btn" data-act="listen" data-room="' + r.id + '" aria-pressed="' + listening + '" type="button">' + A.ICON.head + 'Ouvir</button>' +
-        '<button class="btn btn-live" data-act="talk" data-room="' + r.id + '" aria-pressed="' + talking + '" type="button">' + A.ICON.mic + (talking ? 'Falando' : 'Falar') + '</button>' +
-        '<button class="btn wide" data-act="cam" data-room="' + r.id + '" aria-pressed="' + ui.camRooms.has(r.id) + '" type="button">' + A.ICON.cam + (ui.camRooms.has(r.id) ? 'Sair da câmera desta sala' : 'Aparecer na câmera') + '</button>' +
-        '<button class="btn wide" data-act="chat-open" data-room="' + r.id + '" aria-pressed="' + (ui.chatRoom === r.id) + '" type="button">' + A.ICON.chat + 'Chat' + (un ? ' <span class="unread">' + un + '</span>' : '') + '</button></div>';
+      var chatBtn = '<button class="btn" data-act="chat-open" data-room="' + r.id + '" aria-pressed="' + (ui.chatRoom === r.id) + '" type="button">' + A.ICON.chat + 'Chat' + (un ? ' <span class="unread">' + un + '</span>' : '') + '</button>';
+      if (!ui.joined.has(r.id)) {
+        actions = '<div class="room-actions"><button class="btn btn-primary" data-act="room-join" data-room="' + r.id + '" type="button">Entrar na sala</button>' + chatBtn + '</div>';
+      } else {
+        // esquerda: áudio · direita: vídeo · embaixo: chat e sair
+        actions = '<div class="room-actions">' +
+          '<button class="btn" data-act="listen" data-room="' + r.id + '" aria-pressed="' + listening + '" type="button">' + A.ICON.head + 'Ouvir</button>' +
+          '<button class="btn" data-act="watch" data-room="' + r.id + '" aria-pressed="' + ui.watch.has(r.id) + '" type="button">' + A.ICON.cam + 'Ver vídeo</button>' +
+          '<button class="btn btn-live" data-act="talk" data-room="' + r.id + '" aria-pressed="' + talking + '" type="button">' + A.ICON.mic + (talking ? 'Falando' : 'Falar') + '</button>' +
+          '<button class="btn" data-act="cam" data-room="' + r.id + '" aria-pressed="' + ui.camRooms.has(r.id) + '" type="button">' + A.ICON.cam + 'Câmera</button>' +
+          chatBtn +
+          '<button class="btn btn-leave" data-act="room-leave" data-room="' + r.id + '" type="button">Sair da sala</button></div>';
+      }
     } else if (!members.length) {
       actions = '<div class="room-actions"><button class="btn btn-sm wide" data-act="remove-room" data-room="' + r.id + '" type="button">Remover sala vazia</button></div>';
     }
-    return '<article class="room ' + (lvl ? A.LEVEL_CLS[lvl] : '') + (calling ? ' calling' : '') + (listening ? ' hearing' : '') + '" data-drop="' + r.id + '">' +
-      '<div class="room-head"><h3>' + (live ? '<label class="selbox" title="Incluir esta sala na transmissão"><input type="checkbox" data-sel="' + r.id + '"' + (ui.sel.has(r.id) ? ' checked' : '') + ' aria-label="Selecionar a sala ' + r.no + ' para transmissão"></label>' : '') + 'Sala ' + r.no + '</h3><span class="badge">' + (lvl ? A.LEVEL_NAME[lvl] : 'Vazia') + ' · ' + members.length + '</span></div>' +
+    return '<article class="room ' + (lvl ? A.LEVEL_CLS[lvl] : '') + (ui.joined.has(r.id) ? ' joined' : '') + (calling ? ' calling' : '') + (listening ? ' hearing' : '') + '" data-drop="' + r.id + '">' +
+      '<div class="room-head"><h3>' + 'Sala ' + r.no + '</h3><span class="badge">' + (lvl ? A.LEVEL_NAME[lvl] : 'Vazia') + ' · ' + members.length + '</span></div>' +
       body + (status ? '<div class="room-status">' + status + '</div>' : '') + actions + '</article>';
   }
 
@@ -623,24 +656,23 @@
   function lobbyHTML() {
     var people = lobbyPeople();
     var un = ui.unread.lobby || 0;
-    var chatBtn = '<button class="btn wide" data-act="chat-open" data-room="lobby" aria-pressed="' + (ui.chatRoom === 'lobby') + '" type="button">' + A.ICON.chat + 'Chat da sala de espera' + (un ? ' <span class="unread">' + un + '</span>' : '') + '</button>';
+    var chatBtn = '<button class="btn" data-act="chat-open" data-room="lobby" aria-pressed="' + (ui.chatRoom === 'lobby') + '" type="button">' + A.ICON.chat + 'Chat' + (un ? ' <span class="unread">' + un + '</span>' : '') + '</button>';
     var h = '<section class="lobbycard' + (ui.lobbyOn ? ' on' : '') + '"><div class="room-head"><h3>Sala de espera</h3><span class="badge">' + people.length + ' online</span></div>';
     if (!ui.lobbyOn) {
-      h += '<p class="hint">Entre na sala de espera para ver, ouvir e falar com os alunos que estão esperando. Enquanto você estiver conectado, os minutos do LiveKit são consumidos. O chat funciona sem entrar.</p>' +
-        '<div class="room-actions"><button class="btn btn-primary wide" data-act="lobby-join" type="button">Entrar na sala de espera</button>' + chatBtn + '</div></section>';
+      h += '<div class="room-actions"><button class="btn btn-primary" data-act="lobby-join" type="button">Entrar na sala de espera</button>' + chatBtn + '</div></section>';
       return h;
     }
-    h += (people.length ? '<div class="tiles lobby-tiles">' + people.map(lobbyTileHTML).join('') + '</div>' : '<p class="empty">Ninguém na sala de espera agora.</p>');
+    h += ((people.length || ui.lobbyCam) ? '<div class="tiles lobby-tiles">' + (ui.lobbyCam ? selfTileHTML('lobby') : '') + people.map(lobbyTileHTML).join('') + '</div>' : '<p class="empty">Ninguém na sala de espera agora.</p>');
     var status = ui.lobbyTalk ? '<span class="tag live"><i class="pulse"></i>Seu microfone está aberto para a sala de espera</span>'
       : (ui.lobbyListen ? '<span class="tag hear"><span class="eq"><i></i><i></i><i></i></span>Ouvindo a sala de espera</span>' : '<span>Sem áudio</span>');
     if (ui.lobbyCam) status += '<span class="tag live">' + A.ICON.cam + 'Você está na câmera</span>';
     h += '<div class="room-status">' + status + '</div><div class="room-actions">' +
-      '<button class="btn" data-act="lobby-watch" aria-pressed="' + ui.lobbyWatch + '" type="button">' + A.ICON.cam + (ui.lobbyWatch ? 'Parar de ver vídeo' : 'Ver vídeo') + '</button>' +
-      '<button class="btn" data-act="lobby-listen" aria-pressed="' + ui.lobbyListen + '" type="button">' + A.ICON.head + (ui.lobbyListen ? 'Ouvindo' : 'Ouvir') + '</button>' +
+      '<button class="btn" data-act="lobby-listen" aria-pressed="' + ui.lobbyListen + '" type="button">' + A.ICON.head + 'Ouvir</button>' +
+      '<button class="btn" data-act="lobby-watch" aria-pressed="' + ui.lobbyWatch + '" type="button">' + A.ICON.cam + 'Ver vídeo</button>' +
       '<button class="btn btn-live" data-act="lobby-talk" aria-pressed="' + ui.lobbyTalk + '" type="button">' + A.ICON.mic + (ui.lobbyTalk ? 'Falando' : 'Falar') + '</button>' +
-      '<button class="btn" data-act="lobby-cam" aria-pressed="' + ui.lobbyCam + '" type="button">' + A.ICON.cam + (ui.lobbyCam ? 'Sair da câmera' : 'Aparecer na câmera') + '</button>' +
+      '<button class="btn" data-act="lobby-cam" aria-pressed="' + ui.lobbyCam + '" type="button">' + A.ICON.cam + 'Câmera</button>' +
       chatBtn +
-      '<button class="btn wide" data-act="lobby-leave" type="button">Sair da sala de espera</button></div></section>';
+      '<button class="btn btn-leave" data-act="lobby-leave" type="button">Sair da sala</button></div></section>';
     return h;
   }
 
@@ -651,6 +683,10 @@
       return 'Ao iniciar, a aula é trancada e nenhum aluno novo poderá entrar. Iniciar agora com ' + n + ' aluno' + (n === 1 ? '' : 's') + '?';
     }
     if (ui.confirm === 'end-round') return S.phase === 'r2' ? 'Encerrar a rodada 2? Todos voltam para a sala de espera e a aula termina sozinha em ' + (S.closingMinutes || 5) + ' minutos (você pode encerrar antes).' : 'Encerrar a rodada 1 agora? Todos voltam para a sala de espera.';
+    if (ui.confirm === 'kick') {
+      var ks = S.students.find(function (x) { return x.pid === ui.kickPid; });
+      return 'Excluir ' + (ks ? ks.name : 'este aluno') + ' da aula? Ele será desconectado e, para voltar, precisará entrar de novo pelo link.';
+    }
     if (ui.confirm === 'end-class') return 'Encerrar a aula agora? Todos os alunos verão a mensagem final e serão desconectados.';
     return '';
   }
@@ -740,25 +776,22 @@
         '<button class="btn" data-act="plan" type="button">Distribuir automaticamente</button>';
     }
     h += '<button class="btn" data-act="add-room" type="button">+ Sala vazia</button></div>';
-    if (planning) {
-      h += '<p class="hint">' + (S.phase === 'between'
-        ? (S.repeats ? S.repeats + ' par' + (S.repeats > 1 ? 'es' : '') + ' repetido' + (S.repeats > 1 ? 's' : '') + ' da rodada 1 (há poucos alunos em um dos níveis). ' : 'Sugestão da rodada 2 pronta, sem repetir parceiros da rodada 1. ')
-        : 'Os alunos esperam enquanto você monta as salas. ') +
-        'Arraste um aluno para outra sala, ou use o botão &#8644; ao lado do nome. Distribuir de novo refaz todos os grupos.</p>';
-    } else {
-      h += '<p class="hint">As salas começam só com as iniciais. “Ver vídeo” mostra o vídeo da sala escolhida (e passa a consumir dados do LiveKit só dela). “Ouvir” liga o áudio só da sala escolhida. “Falar” abre o seu microfone só para ela. Use fones de ouvido para evitar eco.</p>';
+    if (planning && S.phase === 'between' && S.repeats) {
+      h += '<p class="hint">' + S.repeats + ' par' + (S.repeats > 1 ? 'es' : '') + ' repetido' + (S.repeats > 1 ? 's' : '') + ' da rodada 1 (há poucos alunos em um dos níveis).</p>';
+    } else if (live) {
+      h += '<p class="hint">Use “Entrar na sala” para ver, ouvir e falar com uma sala. Use fones de ouvido para evitar eco.</p>';
     }
 
-    if (!live || unassigned.some(function (u) { return u.online; })) h += lobbyHTML(by);
-    h += '<div id="set-slot"></div>';
-    if (live) h += '<div id="bc-slot"></div>';
-    h += '<div class="board">';
+    var duo = '';
+    if (!live || unassigned.some(function (u) { return u.online; })) duo += lobbyHTML(by);
     if (planning || unassigned.length) {
-      h += '<section class="zone bucket" data-drop="none"><h3>Sem sala <span class="badge lv-misto">' + unassigned.length + '</span></h3><div class="plist">' +
+      duo += '<section class="zone bucket" data-drop="none"><h3>Sem sala <span class="badge lv-misto">' + unassigned.length + '</span></h3><div class="plist">' +
         (unassigned.length ? unassigned.map(function (s) { return chipHTML(s, null); }).join('') : '<span class="empty">Todos os alunos estão em salas. Arraste um aluno para cá para tirá-lo de uma sala.</span>') + '</div></section>';
     }
-    h += S.rooms.map(function (r) { return roomHTML(r, by); }).join('') + '</div>';
-    h += '<div id="em-slot"></div>';
+    if (duo) h += '<div class="duo">' + duo + '</div>';
+    if (live) h += '<div id="bc-slot"></div>';
+    h += '<div class="board">' + S.rooms.map(function (r) { return roomHTML(r, by); }).join('') + '</div>';
+    h += '<div id="set-slot"></div><div id="em-slot"></div>';
 
     app.innerHTML = h;
     postRender();
@@ -771,6 +804,7 @@
     });
     var bslot = $('bc-slot');
     if (bslot) { ensureBc(); renderBcTop(); bslot.appendChild(bcEl); }
+    mountSelf();
     var eslot = $('em-slot');
     if (eslot) { ensureEm(); eslot.appendChild(emEl); }
     mountSettings();
@@ -864,10 +898,17 @@
     bcEl = document.createElement('section');
     bcEl.className = 'bcast';
     bcEl.innerHTML = '<div id="bc-top"></div>' +
-      '<form id="bc-form" class="bc-form" autocomplete="off"><input class="input" id="bc-text" maxlength="300" placeholder="Mensagem do professor para as salas…" aria-label="Mensagem do professor">' +
+      '<form id="bc-form" class="bc-step" autocomplete="off"><div class="bc-step-h"><span class="num">3</span><b>Envie uma mensagem</b><span class="small">aparece no chat dos alunos</span></div>' +
+      '<div class="bc-form"><input class="input" id="bc-text" maxlength="300" placeholder="Mensagem do professor para as salas…" aria-label="Mensagem do professor">' +
       '<button class="btn btn-primary" type="submit" data-send="sel" id="bc-send-sel">Enviar às selecionadas</button>' +
-      '<button class="btn" type="button" data-act="bc-send-all">Enviar a todas</button></form>';
+      '<button class="btn" type="button" data-act="bc-send-all">Enviar a todas</button></div></form>';
     bcEl.querySelector('#bc-form').addEventListener('submit', function (e) { e.preventDefault(); sendBroadcast('sel'); });
+  }
+  function bcCard(icon, title, active, count, onAct, offAct, selAct, n) {
+    var body = active
+      ? '<button class="btn btn-live" aria-pressed="true" data-act="' + offAct + '" type="button">Parar (' + count + ' sala' + (count === 1 ? '' : 's') + ')</button>'
+      : '<button class="btn" data-act="' + onAct + '" type="button">Todas as salas</button><button class="btn"' + (n ? '' : ' disabled') + ' data-act="' + selAct + '" type="button">Selecionadas' + (n ? ' (' + n + ')' : '') + '</button>';
+    return '<div class="bc-card' + (active ? ' on' : '') + '"><div class="bc-card-h">' + icon + '<b>' + title + '</b></div><div class="bc-card-b">' + body + '</div></div>';
   }
   function renderBcTop() {
     if (!bcEl || !S) return;
@@ -875,19 +916,17 @@
     var total = S.rooms.length;
     var mic = (S.bmic || []).length;
     var sh = ui.share ? ui.share.rooms.size : 0;
-    var h = '<div class="bc-head"><b>Transmissão do professor</b><span class="small">' + n + ' de ' + total + ' sala' + (total === 1 ? '' : 's') + ' selecionada' + (n === 1 ? '' : 's') + '</span>' +
-      '<button class="btn btn-sm" data-act="sel-all" type="button">Todas</button><button class="btn btn-sm" data-act="sel-none" type="button">Nenhuma</button></div>' +
-      '<div class="bc-actions"><div class="bc-group"><span class="lbl-t">Microfone</span>';
-    if (mic) h += '<button class="btn btn-live" aria-pressed="true" data-act="bmic-off" type="button">' + A.ICON.mic + 'Desligar (' + mic + ' sala' + (mic === 1 ? '' : 's') + ')</button>';
-    else h += '<button class="btn" data-act="bmic-all" type="button">' + A.ICON.mic + 'Todas as salas</button><button class="btn"' + (n ? '' : ' disabled') + ' data-act="bmic-sel" type="button">' + A.ICON.mic + 'Selecionadas</button>';
-    h += '</div><div class="bc-group"><span class="lbl-t">Tela</span>';
-    if (sh) h += '<button class="btn btn-live" aria-pressed="true" data-act="share-stop" type="button">' + A.ICON.screen + 'Parar (' + sh + ' sala' + (sh === 1 ? '' : 's') + ')</button>';
-    else h += '<button class="btn" data-act="share-all" type="button">' + A.ICON.screen + 'Todas as salas</button><button class="btn"' + (n ? '' : ' disabled') + ' data-act="share-sel" type="button">' + A.ICON.screen + 'Selecionadas</button>';
     var cm = ui.camRooms.size;
-    h += '</div><div class="bc-group"><span class="lbl-t">Câmera</span>';
-    if (cm) h += '<button class="btn btn-live" aria-pressed="true" data-act="cam-off" type="button">' + A.ICON.cam + 'Desligar (' + cm + ' sala' + (cm === 1 ? '' : 's') + ')</button>';
-    else h += '<button class="btn" data-act="cam-all" type="button">' + A.ICON.cam + 'Todas as salas</button><button class="btn"' + (n ? '' : ' disabled') + ' data-act="cam-sel" type="button">' + A.ICON.cam + 'Selecionadas</button>';
-    h += '</div></div><p class="hint">Marque as salas pela caixinha no topo de cada uma. Falar, câmera e tela conectam você às salas escolhidas e consomem minutos do LiveKit enquanto estiverem ligados. Para tela e câmera, quanto mais salas, mais internet de envio é preciso.</p>';
+    var h = '<div class="bc-title"><b>Transmissão do professor</b><span class="small">Enviar para várias salas ao mesmo tempo. Microfone, tela e câmera usam minutos do LiveKit enquanto estiverem ligados.</span></div>' +
+      '<div class="bc-step"><div class="bc-step-h"><span class="num">1</span><b>Escolha as salas</b><span class="small">' + n + ' de ' + total + ' selecionada' + (n === 1 ? '' : 's') + '</span><span class="spacer"></span>' +
+      '<button class="btn btn-sm" data-act="sel-all" type="button">Todas</button><button class="btn btn-sm" data-act="sel-none" type="button">Nenhuma</button></div>' +
+      '<div class="bc-rooms">' + S.rooms.map(function (r) {
+        return '<label class="bc-chip' + (ui.sel.has(r.id) ? ' on' : '') + '"><input type="checkbox" data-sel="' + r.id + '"' + (ui.sel.has(r.id) ? ' checked' : '') + '> Sala ' + r.no + '</label>';
+      }).join('') + '</div></div>' +
+      '<div class="bc-step"><div class="bc-step-h"><span class="num">2</span><b>Compartilhe</b></div><div class="bc-cards">' +
+      bcCard(A.ICON.mic, 'Microfone', mic > 0, mic, 'bmic-all', 'bmic-off', 'bmic-sel', n) +
+      bcCard(A.ICON.screen, 'Tela', sh > 0, sh, 'share-all', 'share-stop', 'share-sel', n) +
+      bcCard(A.ICON.cam, 'Câmera', cm > 0, cm, 'cam-all', 'cam-off', 'cam-sel', n) + '</div></div>';
     bcEl.querySelector('#bc-top').innerHTML = h;
     bcEl.querySelector('#bc-send-sel').disabled = !n;
   }
@@ -1090,11 +1129,12 @@
     if (a === 'main') { ui.confirm = isPlanning() ? 'start' : (S.phase === 'closing' ? 'end-class' : 'end-round'); render(); return; }
     if (a === 'allow-late') { act({ action: 'allow-late', on: !S.allowLate }); return; }
     if (a === 'ask-end-class') { ui.confirm = 'end-class'; render(); return; }
-    if (a === 'confirm-no') { ui.confirm = null; render(); return; }
+    if (a === 'confirm-no') { ui.confirm = null; ui.kickPid = null; render(); return; }
     if (a === 'confirm-yes') {
       var what = ui.confirm;
       ui.confirm = null;
       render();
+      if (what === 'kick') { var kp = ui.kickPid; ui.kickPid = null; act({ action: 'kick', pid: kp }); return; }
       act({ action: what });
       return;
     }
@@ -1107,7 +1147,7 @@
     }
     if (a === 'add-room') { act({ action: 'add-room' }); return; }
     if (a === 'remove-room') { act({ action: 'remove-room', roomId: room }); return; }
-    if (a === 'kick') { act({ action: 'kick', pid: el.getAttribute('data-pid') }); return; }
+    if (a === 'ask-kick') { ui.kickPid = el.getAttribute('data-pid'); ui.confirm = 'kick'; render(); return; }
     if (a === 'sel-all') { S.rooms.forEach(function (r) { ui.sel.add(r.id); }); render(); return; }
     if (a === 'sel-none') { ui.sel.clear(); render(); return; }
     if (a === 'bmic-all') { setBmic(S.rooms.map(function (r) { return r.id; })); return; }
@@ -1121,7 +1161,7 @@
     if (a === 'chat-close') { ui.chatRoom = null; renderDock(false); render(); return; }
     if (a === 'em-save') { saveEm(false); return; }
     if (a === 'em-reset') { saveEm(true); return; }
-    if (a === 'lobby-join') { ui.lobbyOn = true; ui.lobbyListen = true; startAudioAll(); syncViews(); applyHear(); render(); return; }
+    if (a === 'lobby-join') { ui.lobbyOn = true; ui.lobbyListen = true; ui.lobbyWatch = true; startAudioAll(); syncViews(); applyHear(); render(); return; }
     if (a === 'lobby-leave') { ui.lobbyOn = false; ui.lobbyWatch = false; ui.lobbyTalk = false; ui.lobbyCam = false; syncViews(); applyHear(); render(); return; }
     if (a === 'lobby-watch') { ui.lobbyWatch = !ui.lobbyWatch; applyHear(); render(); return; }
     if (a === 'lobby-listen') { ui.lobbyListen = !ui.lobbyListen; startAudioAll(); applyHear(); render(); return; }
@@ -1130,6 +1170,18 @@
     if (a === 'cam-all') { S.rooms.forEach(function (r) { ui.camRooms.add(r.id); }); syncViews(); applyHear(); render(); return; }
     if (a === 'cam-sel') { selectedIds().forEach(function (id) { ui.camRooms.add(id); }); syncViews(); applyHear(); render(); return; }
     if (a === 'cam-off') { ui.camRooms.clear(); applyHear(); syncViews(); render(); return; }
+    if (a === 'room-join') {
+      ui.joined.add(room); ui.watch.add(room);
+      startAudioAll();
+      setHear({ roomId: room, mode: 'listen' });      // entra ouvindo e vendo, com microfone e câmera desligados
+      return;
+    }
+    if (a === 'room-leave') {
+      ui.joined.delete(room); ui.watch.delete(room); ui.camRooms.delete(room);
+      if (S.hear && S.hear.roomId === room) setHear(null);
+      else { syncViews(); applyHear(); render(); }
+      return;
+    }
     if (a === 'watch') {
       if (ui.watch.has(room)) ui.watch.delete(room); else ui.watch.add(room);
       syncViews(); applyHear(); render();
@@ -1153,6 +1205,7 @@
     if (a === 'answer') {
       startAudioAll();
       S.students.forEach(function (s) { var r = S.rooms.find(function (x) { return x.id === room; }); if (r && r.members.indexOf(s.pid) !== -1) s.callAt = null; });
+      ui.joined.add(room); ui.watch.add(room);
       ui.camRooms.add(room);                   // ao atender, o professor também aparece na câmera da sala
       setHear({ roomId: room, mode: 'talk' });
       act({ action: 'answer', roomId: room });
@@ -1165,6 +1218,7 @@
     else if (el && el.matches && el.matches('input[data-sel]')) {
       var id = el.getAttribute('data-sel');
       if (el.checked) ui.sel.add(id); else ui.sel.delete(id);
+      document.querySelectorAll('input[data-sel="' + id + '"]').forEach(function (i) { i.checked = ui.sel.has(id); });
       renderBcTop();
     }
   });

@@ -101,3 +101,7 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 
 ## Versão de 28/10 (5): novo visual
 - Só aparência, em `public/tema.css` (cores da logo, botões de apertar, fonte Nunito, animações leves, logo em `public/logo.png` no rodapé). Para voltar ao visual antigo, remova o link de tema.css das páginas.
+
+## Versão de 28/10 (6): painel do professor
+- Cada sala tem Entrar na sala (entra ouvindo e vendo, sem microfone/câmera; ao Atender entra falando e com câmera), igual à sala de espera; sua câmera aparece como "Você" nas salas e na sala de espera.
+- Transmissão em 3 passos; Sem sala ao lado da sala de espera; excluir aluno com confirmação; teclado do Tradutor só sobe ao tocar no campo.

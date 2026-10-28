@@ -124,3 +124,7 @@ body.in-live .brandmark img, body.in-wait .brandmark img { height: 18px; }
 @media (prefers-reduced-motion: reduce) {
   #screen .card, #waiting > .card, #live, #live .tile, #lobby .tile, .chat-list .cm:last-child, .dyn .box, .brandmark img { animation: none; transition: none; }
 }
+
+.btn-leave { background: var(--live); color: var(--on-live); border-color: var(--live-dk); box-shadow: 0 3px 0 var(--live-dk); }
+.bc-title { border-radius: 0; }
+.bc-chip { box-shadow: 0 2px 0 var(--line); }
