@@ -95,3 +95,6 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 - Botões Microfone/Câmera com interruptor (aceso e à direita = ligado).
 - Sala de espera: câmeras se redimensionam para caber todos no mesmo espaço, sem rolagem; chat com botão Esconder; temas menores.
 - Aba **Atividades** com **Dinâmicas** e **Perguntas**. Perguntas vêm de `lib/perguntas.json` (228, nenhuma de sim/não), a mesma para toda a sala, com "Sortear outra pergunta" e "Ver tradução".
+
+## Versão de 28/10 (4)
+- Topo bem mais fino; temas à direita acima do chat no computador; botão único Chamar/Cancelar chamado (pulsa enquanto chamando); microfone e câmera seguem o estado que o aluno tinha ao trocar de sala; encerramento só com a contagem.

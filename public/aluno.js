@@ -351,10 +351,11 @@
   // ---------- sala de espera ----------
   function updateWaiting(running) {
     $('w-count').hidden = snap.phase !== 'closing';
+    $('themes').hidden = !themeItems.length || snap.phase === 'closing';
     if (snap.phase === 'closing') {
-      $('w-phase').textContent = 'Encerramento';
-      $('w-head').textContent = 'Obrigado pelas conversas!';
-      $('w-sub').textContent = 'Todos voltaram para a sala de espera. Aproveite para se despedir e fale com o professor. A aula termina sozinha quando a contagem chegar a zero.';
+      $('w-phase').textContent = '';
+      $('w-head').textContent = '';
+      $('w-sub').textContent = '';
       $('w-note').textContent = '';
     } else if (running) {
       $('w-phase').textContent = 'Rodada em andamento';
@@ -376,10 +377,12 @@
   }
 
   // ---------- temas sugeridos (Firebase, via servidor) ----------
+  var themeItems = [];
   function loadThemes() {
     fetch('/api/temas').then(function (r) { return r.json(); }).then(function (t) {
       var items = [t.t1, t.t2].filter(Boolean);
-      $('themes').hidden = !items.length;
+      themeItems = items;
+      $('themes').hidden = !items.length || !!(snap && snap.phase === 'closing');
       $('themes-list').innerHTML = items.map(function (x) { return '<li>' + A.esc(x) + '</li>'; }).join('');
     }).catch(function () { /* ignorar */ });
   }
@@ -614,12 +617,23 @@
     t.el.classList.toggle('mic-off', !mic || mic.isMuted);
   }
 
+  // estado de microfone e câmera que o aluno estava usando: segue com ele entre sala de espera e salas
+  var lastMedia = null;
+  function applyMedia(room, onErr) {
+    var lp = room.localParticipant;
+    var m = lastMedia || { mic: false, cam: false };
+    var micErr = null, camErr = null;
+    return (m.mic ? lp.setMicrophoneEnabled(true).catch(function (e) { micErr = e; }) : Promise.resolve())
+      .then(function () { return m.cam ? lp.setCameraEnabled(true).catch(function (e) { camErr = e; }) : null; })
+      .then(function () { if (micErr || camErr) onErr(micErr, camErr); });
+  }
   function sw(on) { return '<span class="sw' + (on ? ' on' : '') + '" aria-hidden="true"><i></i></span>'; }
   function updateControls() {
     if (!live) return;
     var lp = live.room.localParticipant;
     var micOn = lp.isMicrophoneEnabled;
     var camOn = lp.isCameraEnabled;
+    lastMedia = { mic: micOn, cam: camOn };
     var mic = $('l-mic');
     var cam = $('l-cam');
     mic.innerHTML = (micOn ? A.ICON.mic : A.ICON.micoff) + 'Microfone' + sw(micOn);
@@ -730,8 +744,9 @@
   function enableMedia(room, seq) {
     var micErr = null;
     var camErr = null;
-    return room.localParticipant.setMicrophoneEnabled(true).catch(function (e) { micErr = e; })
-      .then(function () { return room.localParticipant.setCameraEnabled(true).catch(function (e) { camErr = e; }); })
+    var want = lastMedia || { mic: true, cam: true };   // sem histórico (entrou direto na sala): liga os dois
+    return (want.mic ? room.localParticipant.setMicrophoneEnabled(true).catch(function (e) { micErr = e; }) : Promise.resolve())
+      .then(function () { return want.cam ? room.localParticipant.setCameraEnabled(true).catch(function (e) { camErr = e; }) : null; })
       .then(function () {
         if (seq !== connSeq) return;
         attachLocalVideo(room);
@@ -808,10 +823,9 @@
       b.hidden = true;
     }
     var call = $('l-call');
-    call.innerHTML = A.ICON.bell + (r.calling ? 'Chamado enviado' : 'Chamar professor');
+    call.innerHTML = A.ICON.bell + (r.calling ? 'Cancelar chamado' : 'Chamar professor');
     call.disabled = false;
-    call.setAttribute('aria-disabled', String(!!r.calling));
-    $('l-cancel').hidden = !r.calling;
+    call.classList.toggle('calling', !!r.calling);
     syncTiles();
     syncChat();
     syncDyn();
@@ -840,8 +854,7 @@
       .then(function () { snap.room.calling = on; updateLive(); })
       .catch(function (e) { setWarn(e.message, false); });
   }
-  $('l-call').addEventListener('click', function () { if (snap && snap.room && !snap.room.calling) setCall(true); });
-  $('l-cancel').addEventListener('click', function () { setCall(false); });
+  $('l-call').addEventListener('click', function () { if (snap && snap.room) setCall(!snap.room.calling); });
   $('l-mic').addEventListener('click', function () {
     if (!live) return;
     var lp = live.room.localParticipant;
@@ -930,6 +943,7 @@
     var lp = lobby && lobby.room.localParticipant;
     var micOn = !!lp && lp.isMicrophoneEnabled;
     var camOn = !!lp && lp.isCameraEnabled;
+    if (lobby) lastMedia = { mic: micOn, cam: camOn };
     mic.innerHTML = (micOn ? A.ICON.mic : A.ICON.micoff) + 'Microfone' + sw(micOn);
     mic.setAttribute('aria-label', micOn ? 'Microfone ligado. Toque para desligar' : 'Microfone desligado. Toque para ligar');
     cam.setAttribute('aria-label', camOn ? 'Câmera ligada. Toque para desligar' : 'Câmera desligada. Toque para ligar');
@@ -1014,8 +1028,13 @@
         lobbyLocal(room);
         room.remoteParticipants.forEach(function (p) { lobbyTile(p.identity, p.name); });
         $('lb-sound').hidden = room.canPlaybackAudio;
-        lobbyControls();
         loadLobbyChat();
+        // volta com o mesmo microfone e câmera que o aluno tinha antes
+        var rec = lastMedia;
+        lastMedia = lastMedia || { mic: false, cam: false };
+        return applyMedia(room, function (me, ce) {
+          lobbyWarn('Não consegui ligar ' + (me && ce ? 'a câmera e o microfone' : (ce ? 'a câmera' : 'o microfone')) + ' de novo. Toque no botão para tentar outra vez e, se o navegador pedir, escolha Permitir.');
+        }).then(function () { if (seq !== lobbySeq) return; lobbyLocal(room); lobbyControls(); });
       }, function () {
         if (seq !== lobbySeq) return;
         reportProblem('video-falhou');

@@ -9,6 +9,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="/shared.css">
 <style>
+  .topctl { top: max(3px, env(safe-area-inset-top)); right: 6px; gap: 6px; }
+  .topctl .btn, .topctl .theme-btn { min-height: 28px; height: 28px; padding: 0 10px; font-size: 13px; }
+  .topctl .theme-btn { width: 28px; padding: 0; }
+  .topctl .theme-btn svg { width: 16px; height: 16px; }
+  body { padding-top: max(3px, env(safe-area-inset-top)); }
   @media (max-width: 899px) {
     body { padding-left: max(5px, env(safe-area-inset-left, 0px)); padding-right: max(5px, env(safe-area-inset-right, 0px)); }
     .wrap { padding-left: 0; padding-right: 0; }
@@ -16,8 +21,8 @@
     .lobby { padding: 8px; }
     .chat { padding: 10px; }
   }
-  .wrap { max-width: 980px; margin: 0 auto; padding: 10px 6px calc(40px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; }
-  .brand { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 6px calc(40px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; }
+  .brand { min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .netbar { background: var(--call-bg); color: var(--call); border: 1px solid var(--call-line); border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
   .card h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
   .card h2 { font-size: 17px; font-weight: 600; }
@@ -143,6 +148,10 @@
   .lobby-chat-head .lbl { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
   .lobby-chat.collapsed .chat-list, .lobby-chat.collapsed .chat-form { display: none; }
   .w-head { display: contents; }
+  #w-phase:empty { display: none; }
+  .call-big.calling { animation: callpulse 1.3s ease-in-out infinite; }
+  @keyframes callpulse { 0%, 100% { transform: scale(0.97); } 50% { transform: scale(1.04); } }
+  @media (prefers-reduced-motion: reduce) { .call-big.calling { animation: none; } }
   .tile.me video { transform: scaleX(-1); }
   .sw { flex: none; width: 34px; height: 20px; border-radius: 10px; background: rgba(110, 120, 130, 0.6); position: relative; transition: background 0.2s, box-shadow 0.2s; }
   .sw i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.35); transition: left 0.2s; }
@@ -153,7 +162,7 @@
   .subtabs .sub.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
   @media (min-width: 900px) and (min-height: 560px) {
     body.in-wait { overflow: hidden; padding-block: 0; }
-    body.in-wait .wrap { max-width: none; height: 100vh; height: 100dvh; overflow: hidden; padding: 10px 20px 12px; gap: 8px; box-sizing: border-box; }
+    body.in-wait .wrap { max-width: none; height: 100vh; height: 100dvh; overflow: hidden; padding: 0 20px 10px; gap: 8px; box-sizing: border-box; }
     body.in-wait .brand, body.in-wait .netbar { flex: none; }
     body.in-wait #waiting { flex: 1; min-height: 0; }
     body.in-wait #waiting .card { height: 100%; box-sizing: border-box; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 380px; grid-template-rows: auto auto minmax(0, 1fr) auto auto auto auto; column-gap: 16px; row-gap: 8px; align-content: stretch; }
@@ -161,12 +170,13 @@
     body.in-wait .lobby { display: contents; }
     body.in-wait .lobby[hidden] { display: none; }
     body.in-wait .lobby-head { grid-column: 1; grid-row: 2; }
+    body.in-wait .themes { grid-column: 2; grid-row: 2; margin: 0; max-width: none; align-self: end; }
     body.in-wait .lobby-tiles { grid-column: 1; grid-row: 3; height: auto; min-height: 0; }
     body.in-wait #lobby-audio { grid-column: 1; grid-row: 4; }
     body.in-wait #lb-warn { grid-column: 1; grid-row: 4; }
     body.in-wait .lobby .controls { grid-column: 1; grid-row: 5; }
     body.in-wait #lb-sound { grid-column: 1; grid-row: 6; }
-    body.in-wait .lobby-chat { grid-column: 2; grid-row: 2 / span 3; min-height: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+    body.in-wait .lobby-chat { grid-column: 2; grid-row: 3 / span 2; min-height: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
     body.in-wait .lobby-chat .chat-list { flex: 1; height: auto; min-height: 0; }
     body.in-wait .game { grid-column: 2; grid-row: 5 / span 3; margin: 0; min-height: 0; overflow-y: auto; }
     body.in-wait .check { grid-column: 1; grid-row: 7; }
@@ -188,7 +198,7 @@
   .live-body, .live-main, .live-side { display: contents; }
   @media (min-width: 900px) and (min-height: 560px) {
     body.in-live { overflow: hidden; padding-block: 0; }
-    body.in-live .wrap { max-width: none; height: 100vh; height: 100dvh; overflow: hidden; padding: 10px 20px 12px; gap: 10px; box-sizing: border-box; }
+    body.in-live .wrap { max-width: none; height: 100vh; height: 100dvh; overflow: hidden; padding: 0 20px 10px; gap: 8px; box-sizing: border-box; }
     body.in-live .brand, body.in-live .netbar { flex: none; }
     body.in-live #live { flex: 1; min-height: 0; gap: 10px; }
     body.in-live .live-top { flex: none; }
@@ -247,10 +257,10 @@
           <span class="count-lbl">A aula encerra automaticamente em</span>
           <span class="timer" id="w-count-time" role="timer">05:00</span>
         </div>
+        </div>
         <div class="themes" id="themes" hidden>
           <h2>Temas sugeridos da aula</h2>
           <ul id="themes-list"></ul>
-        </div>
         </div>
         <section class="lobby" id="lobby" aria-label="Sala de espera" hidden>
           <div class="lobby-head"><h2>Quem está na sala de espera <span class="small" id="lobby-count"></span></h2></div>
@@ -326,7 +336,6 @@
         <div class="live-side">
           <button class="btn btn-sm" id="l-sound" type="button" hidden>Ativar o som da sala</button>
           <button class="btn btn-call call-big" id="l-call" type="button"></button>
-          <button class="btn btn-sm" id="l-cancel" type="button" hidden>Cancelar chamado</button>
           <section class="chat" id="l-chat" aria-label="Chat da sala">
             <div class="chat-head">
               <div class="tabs" role="tablist">
