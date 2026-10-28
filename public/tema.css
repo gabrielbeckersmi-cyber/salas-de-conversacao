@@ -1,0 +1,126 @@
+/* Tema visual (cores e estilo da logo: azul, vermelho e estrela). Só aparência: não muda funções nem posições.
+   Para voltar ao visual anterior, é só remover o <link> deste arquivo das páginas. */
+:root {
+  --bg: #eaf4fb; --surface: #ffffff; --surface-2: #f0f7fc;
+  --ink: #173047; --ink-2: #587086; --line: #d3e4f1;
+  --primary: #0e86d8; --on-primary: #ffffff; --primary-dk: #0a5f9c;
+  --basic: #23913f; --basic-bg: #ddf4e3;
+  --inter: #0e86d8; --inter-bg: #d9edfb;
+  --mixed: #7a4fc0; --mixed-bg: #ece4f9;
+  --call: #9a5200; --on-call: #4a2a00; --call-bg: #fff1cf; --call-line: #f2b53d;
+  --live: #cd0f0c; --on-live: #ffffff; --live-bg: #fde5e3; --live-dk: #8f0a08;
+  --ok: #1e8a4c; --ok-bg: #ddf4e6;
+  --font-display: 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  --radius: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a1a27; --surface: #11283a; --surface-2: #163247; --ink: #e8f3fb; --ink-2: #9db8cc; --line: #27475f;
+    --primary: #2f9fe9; --on-primary: #04202f; --primary-dk: #14689f;
+    --basic: #5fd38a; --basic-bg: #123a27; --inter: #5db6f2; --inter-bg: #12324d;
+    --mixed: #b9a2ec; --mixed-bg: #2c2347;
+    --call: #f5bd55; --on-call: #3a2200; --call-bg: #3d2f10; --call-line: #8a6420;
+    --live: #ff6a62; --on-live: #2a0907; --live-bg: #47201e; --live-dk: #a8231d;
+    --ok: #6fd69b; --ok-bg: #123826;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a1a27; --surface: #11283a; --surface-2: #163247; --ink: #e8f3fb; --ink-2: #9db8cc; --line: #27475f;
+  --primary: #2f9fe9; --on-primary: #04202f; --primary-dk: #14689f;
+  --basic: #5fd38a; --basic-bg: #123a27; --inter: #5db6f2; --inter-bg: #12324d;
+  --mixed: #b9a2ec; --mixed-bg: #2c2347;
+  --call: #f5bd55; --on-call: #3a2200; --call-bg: #3d2f10; --call-line: #8a6420;
+  --live: #ff6a62; --on-live: #2a0907; --live-bg: #47201e; --live-dk: #a8231d;
+  --ok: #6fd69b; --ok-bg: #123826;
+}
+
+body { font-weight: 600; }
+h1, h2, h3 { font-weight: 800; letter-spacing: -0.01em; }
+.card h1, .card h2 { font-weight: 800; }
+.eyebrow, .lbl, .lbl-t { font-weight: 800; }
+.timer, .dtimer { font-family: var(--font-display); font-weight: 900; font-variant-numeric: tabular-nums; }
+
+/* botões "de apertar" (estilo Duolingo): borda e sombra de baixo, afundam ao tocar */
+.btn {
+  border-radius: 14px; border: 2px solid var(--line); border-bottom-color: var(--line);
+  font-weight: 800; letter-spacing: 0.01em;
+  box-shadow: 0 3px 0 var(--line);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease, background 0.15s ease;
+}
+.btn:hover { background: var(--surface-2); filter: brightness(1.02); }
+.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 0 0 transparent; }
+.btn:disabled { box-shadow: none; }
+.btn-sm { border-radius: 12px; box-shadow: 0 2px 0 var(--line); }
+.btn-sm:active:not(:disabled) { transform: translateY(2px); }
+.btn-primary, .btn[aria-pressed="true"], .btn.on { border-color: var(--primary-dk); background: var(--primary); color: var(--on-primary); box-shadow: 0 3px 0 var(--primary-dk); }
+.btn-primary:hover, .btn[aria-pressed="true"]:hover { background: var(--primary); filter: brightness(1.08); }
+.btn-sm.btn-primary { box-shadow: 0 2px 0 var(--primary-dk); }
+.btn.btn-live[aria-pressed="true"], .btn-live[aria-pressed="true"] { background: var(--live); border-color: var(--live-dk); color: var(--on-live); box-shadow: 0 3px 0 var(--live-dk); }
+.btn-call { background: #ffb81c; color: #4a2a00; border-color: #c98600; box-shadow: 0 4px 0 #c98600; }
+.btn-call:hover { background: #ffc233; filter: none; }
+.call-big { border-radius: 18px; font-weight: 900; }
+.call-big.calling { background: var(--live); color: var(--on-live); border-color: var(--live-dk); box-shadow: 0 4px 0 var(--live-dk); }
+
+.input, .field input, .field select, textarea.input, select.input {
+  border-radius: 12px; border: 2px solid var(--line); background: var(--surface-2); font-weight: 600;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input:focus, .field input:focus, textarea.input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(14, 134, 216, 0.18); background: var(--surface); }
+
+.card { border-radius: 20px; border: 2px solid var(--line); }
+.msg, .banner, .count, .confirm, .calls { border-radius: 14px; }
+.lobby, .themes, .chat, .lobbycard, .crow, .bcast, .em, .zone, .room { border-radius: 16px; border-width: 2px; }
+.seg span { border-radius: 14px; border-width: 2px; font-weight: 800; box-shadow: 0 2px 0 var(--line); }
+.seg input:checked + span { box-shadow: 0 2px 0 var(--lvl); }
+.badge, .pill { font-weight: 800; }
+.tile { border-radius: 14px; }
+.tile.speaking { outline-width: 3px; box-shadow: 0 0 0 4px rgba(14, 134, 216, 0.22); }
+.tile .nm { border-radius: 8px; font-weight: 700; }
+.avatar { font-weight: 800; box-shadow: 0 2px 0 rgba(0,0,0,0.12); }
+
+/* chat */
+.cm { border-radius: 16px 16px 16px 6px; font-weight: 600; }
+.cm.me { border-radius: 16px 16px 6px 16px; background: var(--primary); color: var(--on-primary); }
+.cm.me .who { color: inherit; opacity: 0.85; }
+.cm.prof { border-radius: 14px; background: var(--live); color: var(--on-live); border-left-color: var(--live-dk); }
+
+/* abas */
+.tab { border-radius: 12px; border: 2px solid var(--line); font-weight: 800; box-shadow: 0 3px 0 var(--line); transition: transform 0.08s, box-shadow 0.08s; }
+.tab:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+.tab.on { background: var(--primary); border-color: var(--primary-dk); color: var(--on-primary); box-shadow: 0 3px 0 var(--primary-dk); }
+.subtabs .sub.on { background: var(--primary); border-color: var(--primary-dk); color: var(--on-primary); box-shadow: 0 2px 0 var(--primary-dk); }
+
+/* topo */
+.topctl .btn, .theme-btn { border-width: 2px; border-radius: 999px; }
+.theme-btn { box-shadow: 0 2px 0 var(--line); }
+.topctl .btn { box-shadow: 0 2px 0 var(--line); }
+
+/* quadros das dinâmicas */
+.dyn .box { border-radius: 16px; border-width: 2px; background: var(--surface); box-shadow: 0 3px 0 var(--line); }
+.dyn .box.imp { box-shadow: 0 3px 0 var(--live-dk); }
+.dyn .big { font-weight: 900; color: var(--primary); }
+.dyn .box.imp .big { color: var(--live); }
+.dyn h3 { font-weight: 900; }
+
+/* interruptor */
+.sw.on { background: #3ccf63; box-shadow: 0 0 9px 2px rgba(60, 207, 99, 0.65); }
+
+/* logo embaixo, pequena e centralizada */
+.brandmark { display: flex; justify-content: center; align-items: center; padding: 8px 0 2px; flex: none; margin-top: auto; }
+.brandmark img { height: 22px; width: auto; display: block; opacity: 0.95; transition: transform 0.25s ease; }
+.brandmark img:hover { transform: translateY(-2px) rotate(-4deg) scale(1.08); }
+body.in-live .wrap, body.in-wait .wrap { padding-bottom: 2px; }
+body.in-live .brandmark, body.in-wait .brandmark { padding: 4px 0 0; }
+body.in-live .brandmark img, body.in-wait .brandmark img { height: 18px; }
+
+/* animações leves (só transform/opacity) */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+#screen .card, #waiting > .card, #live { animation: rise 0.35s ease-out; }
+#live .tile, #lobby .tile { animation: pop 0.25s ease-out; }
+.chat-list .cm:last-child { animation: pop 0.2s ease-out; }
+.dyn .box { animation: pop 0.22s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  #screen .card, #waiting > .card, #live, #live .tile, #lobby .tile, .chat-list .cm:last-child, .dyn .box, .brandmark img { animation: none; transition: none; }
+}

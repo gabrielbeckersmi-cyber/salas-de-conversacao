@@ -98,3 +98,6 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 
 ## Versão de 28/10 (4)
 - Topo bem mais fino; temas à direita acima do chat no computador; botão único Chamar/Cancelar chamado (pulsa enquanto chamando); microfone e câmera seguem o estado que o aluno tinha ao trocar de sala; encerramento só com a contagem.
+
+## Versão de 28/10 (5): novo visual
+- Só aparência, em `public/tema.css` (cores da logo, botões de apertar, fonte Nunito, animações leves, logo em `public/logo.png` no rodapé). Para voltar ao visual antigo, remova o link de tema.css das páginas.
