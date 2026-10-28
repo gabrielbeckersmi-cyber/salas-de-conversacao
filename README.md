@@ -67,7 +67,7 @@ Abra http://localhost:3000/professor. Câmera/microfone funcionam em `localhost`
 - **Câmera em várias salas**: no painel "Transmissão do professor" há o grupo Câmera (todas as salas ou só as marcadas). A câmera é capturada uma vez e enviada a cada sala.
 - **Encerramento**: ao terminar a rodada 2, todos voltam para a sala de espera e a aula termina sozinha em 5 minutos (`CLOSING_MINUTES`, padrão 5). O professor pode encerrar antes pelo botão "Encerrar a aula". A mensagem final com link continua sendo exibida no fim.
 - **Alerta dos últimos 30 segundos**: em toda contagem regressiva (rodada e encerramento), aluno e professor veem uma faixa vermelha no topo com os segundos, borda piscando e o relógio pulsando.
-- **Tradutor**: aba ao lado do chat, na sala. Português ⇄ inglês, com Copiar e Ouvir (voz do próprio navegador) no lado em inglês. A aba pisca até o aluno abri-la. Usa o serviço gratuito de tradução do Google e, se ele falhar, o MyMemory.
+- **Tradutor**: aba ao lado do chat, na sala. Português ⇄ inglês, com **Enviar no chat** (a mensagem chega à sala com um ícone 🔊 que toca a pronúncia) e Ouvir (voz do próprio navegador) no lado em inglês. A aba pisca até o aluno abri-la. Usa o serviço gratuito de tradução do Google e, se ele falhar, o MyMemory.
 - **Relatório**: nasce quando a 1ª rodada começa e se atualiza sozinho até o fim. Mostra alunos que entraram, quem participou, níveis, horários de início e fim de cada rodada e da aula, e problemas de conexão (quedas, travamentos, falhas de vídeo, reinícios do servidor). Link: `/relatorio/CÓDIGO-DA-AULA` (qualquer pessoa com o link vê; o código é impossível de adivinhar). A lista de todos os relatórios fica em `/relatorios` (pede login do professor).
 
 ### Para o relatório não se perder quando você sobe atualizações
@@ -79,3 +79,11 @@ Sem disco persistente, o Render apaga os arquivos a cada deploy. Para guardar os
 3. Salve (o Render reinicia). Abra `/healthz` no seu site: deve mostrar `"relatorios":"firebase"`. Em `/relatorios` some o aviso amarelo.
 
 Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chave de serviço dá acesso administrativo ao projeto: guarde-a só no Render, nunca no GitHub. Alternativa: disco persistente do Render (plano pago) com `REPORTS_FILE=/var/data/reports.json`.
+
+
+## Versão de 28/10 (2): Dinâmicas por sala
+- Terceira aba ao lado de Chat e Tradutor (pisca até ser aberta e de novo quando alguém da sala muda a dinâmica).
+- Fluxo: nome + explicação → **Sortear outra** / **Iniciar** → conteúdo. **Brincar novamente** troca o conteúdo mantendo o jogo. Tudo é sincronizado no servidor: qualquer pessoa da sala que clicar muda para todos da sala.
+- Jogos: Impostor (cada um vê só o seu papel), Mímica (palavra privada + cronômetro de 30 s igual para todos), Leilão Maluco, História em Conjunto e Quem sou eu? (você vê os outros, não a si mesmo). **Ver tradução** aparece quando há inglês e some depois de usado.
+- Conteúdo: `lib/dinamicas.json`. O campo `"niveis": ["intermediario"]` (na dinâmica ou em cada item) limita aquele conteúdo a salas só de intermediário; sem o campo vale para todos. Reinicie o servidor depois de editar. Para criar um jogo novo é preciso um dos 5 tipos (`impostor`, `mimica`, `leilao`, `historia`, `quemsou`).
+- Também: câmeras aparecem inteiras (sem corte), menos espaço no topo, scroll da página não trava mais no chat e a voz do "Ouvir" é aquecida na sala de espera.

@@ -1,0 +1,1164 @@
+{
+ "_leia-me": "Edite este arquivo para criar ou mudar dinâmicas. 'niveis' limita a dinâmica (ou o item) a salas só desse nível: [\"intermediario\"]. Sem 'niveis' vale para todos. Reinicie o servidor depois de editar.",
+ "dinamicas": [
+  {
+   "id": "impostor",
+   "nome": "Impostor",
+   "tipo": "impostor",
+   "niveis": [
+    "basico",
+    "intermediario"
+   ],
+   "explicacao": "Todos recebem a mesma palavra, exceto um que será o impostor. Todos falam uma frase em inglês que ajude a entender qual é a palavra. Descubra quem é o impostor.",
+   "conteudo": [
+    {
+     "categoria": {
+      "en": "Animals",
+      "pt": "Animais"
+     },
+     "palavras": [
+      {
+       "en": "dog",
+       "pt": "cachorro"
+      },
+      {
+       "en": "cat",
+       "pt": "gato"
+      },
+      {
+       "en": "horse",
+       "pt": "cavalo"
+      },
+      {
+       "en": "cow",
+       "pt": "vaca"
+      },
+      {
+       "en": "pig",
+       "pt": "porco"
+      },
+      {
+       "en": "chicken",
+       "pt": "galinha"
+      },
+      {
+       "en": "rabbit",
+       "pt": "coelho"
+      },
+      {
+       "en": "monkey",
+       "pt": "macaco"
+      },
+      {
+       "en": "lion",
+       "pt": "leão"
+      },
+      {
+       "en": "elephant",
+       "pt": "elefante"
+      },
+      {
+       "en": "snake",
+       "pt": "cobra"
+      },
+      {
+       "en": "fish",
+       "pt": "peixe"
+      }
+     ]
+    },
+    {
+     "categoria": {
+      "en": "Food",
+      "pt": "Comida"
+     },
+     "palavras": [
+      {
+       "en": "pizza",
+       "pt": "pizza"
+      },
+      {
+       "en": "rice",
+       "pt": "arroz"
+      },
+      {
+       "en": "beans",
+       "pt": "feijão"
+      },
+      {
+       "en": "bread",
+       "pt": "pão"
+      },
+      {
+       "en": "cheese",
+       "pt": "queijo"
+      },
+      {
+       "en": "chocolate",
+       "pt": "chocolate"
+      },
+      {
+       "en": "cake",
+       "pt": "bolo"
+      },
+      {
+       "en": "egg",
+       "pt": "ovo"
+      },
+      {
+       "en": "hamburger",
+       "pt": "hambúrguer"
+      },
+      {
+       "en": "ice cream",
+       "pt": "sorvete"
+      },
+      {
+       "en": "salad",
+       "pt": "salada"
+      },
+      {
+       "en": "soup",
+       "pt": "sopa"
+      }
+     ]
+    },
+    {
+     "categoria": {
+      "en": "Places",
+      "pt": "Lugares"
+     },
+     "palavras": [
+      {
+       "en": "beach",
+       "pt": "praia"
+      },
+      {
+       "en": "school",
+       "pt": "escola"
+      },
+      {
+       "en": "hospital",
+       "pt": "hospital"
+      },
+      {
+       "en": "supermarket",
+       "pt": "supermercado"
+      },
+      {
+       "en": "airport",
+       "pt": "aeroporto"
+      },
+      {
+       "en": "park",
+       "pt": "parque"
+      },
+      {
+       "en": "church",
+       "pt": "igreja"
+      },
+      {
+       "en": "restaurant",
+       "pt": "restaurante"
+      },
+      {
+       "en": "bank",
+       "pt": "banco"
+      },
+      {
+       "en": "library",
+       "pt": "biblioteca"
+      },
+      {
+       "en": "gym",
+       "pt": "academia"
+      },
+      {
+       "en": "cinema",
+       "pt": "cinema"
+      }
+     ]
+    },
+    {
+     "categoria": {
+      "en": "Jobs",
+      "pt": "Profissões"
+     },
+     "palavras": [
+      {
+       "en": "teacher",
+       "pt": "professor"
+      },
+      {
+       "en": "doctor",
+       "pt": "médico"
+      },
+      {
+       "en": "police officer",
+       "pt": "policial"
+      },
+      {
+       "en": "chef",
+       "pt": "cozinheiro"
+      },
+      {
+       "en": "bus driver",
+       "pt": "motorista de ônibus"
+      },
+      {
+       "en": "nurse",
+       "pt": "enfermeiro"
+      },
+      {
+       "en": "pilot",
+       "pt": "piloto"
+      },
+      {
+       "en": "farmer",
+       "pt": "fazendeiro"
+      },
+      {
+       "en": "singer",
+       "pt": "cantor"
+      },
+      {
+       "en": "dentist",
+       "pt": "dentista"
+      },
+      {
+       "en": "firefighter",
+       "pt": "bombeiro"
+      },
+      {
+       "en": "waiter",
+       "pt": "garçom"
+      }
+     ]
+    },
+    {
+     "categoria": {
+      "en": "Transportation",
+      "pt": "Transporte"
+     },
+     "palavras": [
+      {
+       "en": "car",
+       "pt": "carro"
+      },
+      {
+       "en": "bus",
+       "pt": "ônibus"
+      },
+      {
+       "en": "bicycle",
+       "pt": "bicicleta"
+      },
+      {
+       "en": "airplane",
+       "pt": "avião"
+      },
+      {
+       "en": "train",
+       "pt": "trem"
+      },
+      {
+       "en": "boat",
+       "pt": "barco"
+      },
+      {
+       "en": "subway",
+       "pt": "metrô"
+      },
+      {
+       "en": "truck",
+       "pt": "caminhão"
+      },
+      {
+       "en": "motorcycle",
+       "pt": "moto"
+      },
+      {
+       "en": "taxi",
+       "pt": "táxi"
+      },
+      {
+       "en": "helicopter",
+       "pt": "helicóptero"
+      },
+      {
+       "en": "skateboard",
+       "pt": "skate"
+      }
+     ]
+    },
+    {
+     "categoria": {
+      "en": "Things at home",
+      "pt": "Coisas de casa"
+     },
+     "palavras": [
+      {
+       "en": "bed",
+       "pt": "cama"
+      },
+      {
+       "en": "sofa",
+       "pt": "sofá"
+      },
+      {
+       "en": "table",
+       "pt": "mesa"
+      },
+      {
+       "en": "chair",
+       "pt": "cadeira"
+      },
+      {
+       "en": "refrigerator",
+       "pt": "geladeira"
+      },
+      {
+       "en": "television",
+       "pt": "televisão"
+      },
+      {
+       "en": "window",
+       "pt": "janela"
+      },
+      {
+       "en": "door",
+       "pt": "porta"
+      },
+      {
+       "en": "lamp",
+       "pt": "abajur"
+      },
+      {
+       "en": "mirror",
+       "pt": "espelho"
+      },
+      {
+       "en": "pillow",
+       "pt": "travesseiro"
+      },
+      {
+       "en": "shower",
+       "pt": "chuveiro"
+      }
+     ]
+    },
+    {
+     "categoria": {
+      "en": "Clothes",
+      "pt": "Roupas"
+     },
+     "palavras": [
+      {
+       "en": "shirt",
+       "pt": "camisa"
+      },
+      {
+       "en": "pants",
+       "pt": "calça"
+      },
+      {
+       "en": "shoes",
+       "pt": "sapatos"
+      },
+      {
+       "en": "hat",
+       "pt": "chapéu"
+      },
+      {
+       "en": "jacket",
+       "pt": "jaqueta"
+      },
+      {
+       "en": "dress",
+       "pt": "vestido"
+      },
+      {
+       "en": "socks",
+       "pt": "meias"
+      },
+      {
+       "en": "gloves",
+       "pt": "luvas"
+      },
+      {
+       "en": "scarf",
+       "pt": "cachecol"
+      },
+      {
+       "en": "sunglasses",
+       "pt": "óculos de sol"
+      },
+      {
+       "en": "belt",
+       "pt": "cinto"
+      },
+      {
+       "en": "shorts",
+       "pt": "bermuda"
+      }
+     ]
+    },
+    {
+     "categoria": {
+      "en": "Sports",
+      "pt": "Esportes"
+     },
+     "palavras": [
+      {
+       "en": "soccer",
+       "pt": "futebol"
+      },
+      {
+       "en": "basketball",
+       "pt": "basquete"
+      },
+      {
+       "en": "swimming",
+       "pt": "natação"
+      },
+      {
+       "en": "tennis",
+       "pt": "tênis"
+      },
+      {
+       "en": "volleyball",
+       "pt": "vôlei"
+      },
+      {
+       "en": "running",
+       "pt": "corrida"
+      },
+      {
+       "en": "surfing",
+       "pt": "surfe"
+      },
+      {
+       "en": "boxing",
+       "pt": "boxe"
+      },
+      {
+       "en": "cycling",
+       "pt": "ciclismo"
+      },
+      {
+       "en": "golf",
+       "pt": "golfe"
+      },
+      {
+       "en": "skiing",
+       "pt": "esqui"
+      },
+      {
+       "en": "yoga",
+       "pt": "ioga"
+      }
+     ]
+    },
+    {
+     "categoria": {
+      "en": "Feelings",
+      "pt": "Sentimentos"
+     },
+     "palavras": [
+      {
+       "en": "jealous",
+       "pt": "com ciúmes"
+      },
+      {
+       "en": "nervous",
+       "pt": "nervoso"
+      },
+      {
+       "en": "proud",
+       "pt": "orgulhoso"
+      },
+      {
+       "en": "embarrassed",
+       "pt": "envergonhado"
+      },
+      {
+       "en": "disappointed",
+       "pt": "decepcionado"
+      },
+      {
+       "en": "grateful",
+       "pt": "grato"
+      },
+      {
+       "en": "lonely",
+       "pt": "solitário"
+      },
+      {
+       "en": "curious",
+       "pt": "curioso"
+      },
+      {
+       "en": "exhausted",
+       "pt": "exausto"
+      },
+      {
+       "en": "confident",
+       "pt": "confiante"
+      }
+     ],
+     "niveis": [
+      "intermediario"
+     ]
+    },
+    {
+     "categoria": {
+      "en": "Big ideas",
+      "pt": "Ideias"
+     },
+     "palavras": [
+      {
+       "en": "freedom",
+       "pt": "liberdade"
+      },
+      {
+       "en": "success",
+       "pt": "sucesso"
+      },
+      {
+       "en": "friendship",
+       "pt": "amizade"
+      },
+      {
+       "en": "secret",
+       "pt": "segredo"
+      },
+      {
+       "en": "luck",
+       "pt": "sorte"
+      },
+      {
+       "en": "memory",
+       "pt": "memória"
+      },
+      {
+       "en": "adventure",
+       "pt": "aventura"
+      },
+      {
+       "en": "patience",
+       "pt": "paciência"
+      },
+      {
+       "en": "gossip",
+       "pt": "fofoca"
+      },
+      {
+       "en": "deadline",
+       "pt": "prazo"
+      }
+     ],
+     "niveis": [
+      "intermediario"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "mimica",
+   "nome": "Mímica",
+   "tipo": "mimica",
+   "niveis": [
+    "basico",
+    "intermediario"
+   ],
+   "segundos": 30,
+   "explicacao": "Cada jogador recebe uma palavra e deve fazer mímica até descobrirem. Tempo limite de 30 segundos por pessoa.",
+   "conteudo": [
+    {
+     "en": "brush your teeth",
+     "pt": "escovar os dentes"
+    },
+    {
+     "en": "ride a bike",
+     "pt": "andar de bicicleta"
+    },
+    {
+     "en": "play the guitar",
+     "pt": "tocar violão"
+    },
+    {
+     "en": "swim",
+     "pt": "nadar"
+    },
+    {
+     "en": "take a selfie",
+     "pt": "tirar uma selfie"
+    },
+    {
+     "en": "cook dinner",
+     "pt": "cozinhar o jantar"
+    },
+    {
+     "en": "drive a car",
+     "pt": "dirigir um carro"
+    },
+    {
+     "en": "talk on the phone",
+     "pt": "falar ao telefone"
+    },
+    {
+     "en": "wash the dishes",
+     "pt": "lavar a louça"
+    },
+    {
+     "en": "dance",
+     "pt": "dançar"
+    },
+    {
+     "en": "climb a mountain",
+     "pt": "escalar uma montanha"
+    },
+    {
+     "en": "sleep",
+     "pt": "dormir"
+    },
+    {
+     "en": "sneeze",
+     "pt": "espirrar"
+    },
+    {
+     "en": "cry",
+     "pt": "chorar"
+    },
+    {
+     "en": "laugh",
+     "pt": "rir"
+    },
+    {
+     "en": "eat spaghetti",
+     "pt": "comer espaguete"
+    },
+    {
+     "en": "drink hot coffee",
+     "pt": "tomar um café quente"
+    },
+    {
+     "en": "comb your hair",
+     "pt": "pentear o cabelo"
+    },
+    {
+     "en": "play soccer",
+     "pt": "jogar futebol"
+    },
+    {
+     "en": "go fishing",
+     "pt": "pescar"
+    },
+    {
+     "en": "paint a wall",
+     "pt": "pintar uma parede"
+    },
+    {
+     "en": "plant a tree",
+     "pt": "plantar uma árvore"
+    },
+    {
+     "en": "pet a dog",
+     "pt": "fazer carinho em um cachorro"
+    },
+    {
+     "en": "fly a kite",
+     "pt": "soltar pipa"
+    },
+    {
+     "en": "jump rope",
+     "pt": "pular corda"
+    },
+    {
+     "en": "take a shower",
+     "pt": "tomar banho"
+    },
+    {
+     "en": "read a book",
+     "pt": "ler um livro"
+    },
+    {
+     "en": "type on a computer",
+     "pt": "digitar no computador"
+    },
+    {
+     "en": "put on makeup",
+     "pt": "se maquiar"
+    },
+    {
+     "en": "sing in the shower",
+     "pt": "cantar no chuveiro"
+    },
+    {
+     "en": "ski",
+     "pt": "esquiar"
+    },
+    {
+     "en": "surf",
+     "pt": "surfar"
+    },
+    {
+     "en": "row a boat",
+     "pt": "remar um barco"
+    },
+    {
+     "en": "shoot a basketball",
+     "pt": "arremessar uma bola de basquete"
+    },
+    {
+     "en": "play the piano",
+     "pt": "tocar piano"
+    },
+    {
+     "en": "play the drums",
+     "pt": "tocar bateria"
+    },
+    {
+     "en": "iron a shirt",
+     "pt": "passar uma camisa"
+    },
+    {
+     "en": "mop the floor",
+     "pt": "passar pano no chão"
+    },
+    {
+     "en": "brush a horse",
+     "pt": "escovar um cavalo"
+    },
+    {
+     "en": "build a snowman",
+     "pt": "construir um boneco de neve"
+    },
+    {
+     "en": "have a terrible hangover",
+     "pt": "estar com uma ressaca terrível",
+     "niveis": [
+      "intermediario"
+     ]
+    },
+    {
+     "en": "parallel park a car",
+     "pt": "fazer baliza com o carro",
+     "niveis": [
+      "intermediario"
+     ]
+    },
+    {
+     "en": "negotiate a salary",
+     "pt": "negociar um salário",
+     "niveis": [
+      "intermediario"
+     ]
+    },
+    {
+     "en": "get stuck in traffic",
+     "pt": "ficar preso no trânsito",
+     "niveis": [
+      "intermediario"
+     ]
+    },
+    {
+     "en": "try to catch a bus that is leaving",
+     "pt": "tentar pegar um ônibus que está saindo",
+     "niveis": [
+      "intermediario"
+     ]
+    },
+    {
+     "en": "give a speech",
+     "pt": "fazer um discurso",
+     "niveis": [
+      "intermediario"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "leilao",
+   "nome": "Leilão Maluco",
+   "tipo": "leilao",
+   "niveis": [
+    "basico",
+    "intermediario"
+   ],
+   "explicacao": "Escolham algum jogador para vender o objeto inútil ou estranho que aparecerá na tela. Ele deverá convencer os outros jogadores a comprar.",
+   "conteudo": [
+    {
+     "en": "a pair of socks for a snake",
+     "pt": "um par de meias para uma cobra"
+    },
+    {
+     "en": "an umbrella with holes",
+     "pt": "um guarda-chuva furado"
+    },
+    {
+     "en": "a left shoe",
+     "pt": "um sapato do pé esquerdo"
+    },
+    {
+     "en": "a talking banana",
+     "pt": "uma banana falante"
+    },
+    {
+     "en": "an alarm clock that sings",
+     "pt": "um despertador que canta"
+    },
+    {
+     "en": "a bathtub with wheels",
+     "pt": "uma banheira com rodinhas"
+    },
+    {
+     "en": "a spoon with a hole in it",
+     "pt": "uma colher com um buraco"
+    },
+    {
+     "en": "an invisible hat",
+     "pt": "um chapéu invisível"
+    },
+    {
+     "en": "a fork that bends",
+     "pt": "um garfo que entorta"
+    },
+    {
+     "en": "a one-wheeled bicycle",
+     "pt": "uma bicicleta de uma roda só"
+    },
+    {
+     "en": "a book with no words",
+     "pt": "um livro sem palavras"
+    },
+    {
+     "en": "a refrigerator that is always warm",
+     "pt": "uma geladeira que é sempre quente"
+    },
+    {
+     "en": "a cat costume for a dog",
+     "pt": "uma fantasia de gato para cachorro"
+    },
+    {
+     "en": "a very small pillow",
+     "pt": "um travesseiro minúsculo"
+    },
+    {
+     "en": "a flying toaster",
+     "pt": "uma torradeira voadora"
+    },
+    {
+     "en": "a pencil with no point",
+     "pt": "um lápis sem ponta"
+    },
+    {
+     "en": "a clock that runs backwards",
+     "pt": "um relógio que anda para trás"
+    },
+    {
+     "en": "a chair with three legs",
+     "pt": "uma cadeira de três pés"
+    },
+    {
+     "en": "a toothbrush for a crocodile",
+     "pt": "uma escova de dentes para um crocodilo"
+    },
+    {
+     "en": "a map of a place that does not exist",
+     "pt": "um mapa de um lugar que não existe"
+    },
+    {
+     "en": "a mirror that tells jokes",
+     "pt": "um espelho que conta piadas"
+    },
+    {
+     "en": "a pair of glasses for a fish",
+     "pt": "óculos para um peixe"
+    },
+    {
+     "en": "a sofa made of ice",
+     "pt": "um sofá feito de gelo"
+    },
+    {
+     "en": "a bottle of air from the moon",
+     "pt": "uma garrafa de ar da lua"
+    },
+    {
+     "en": "a candle that never melts",
+     "pt": "uma vela que nunca derrete"
+    }
+   ]
+  },
+  {
+   "id": "historia",
+   "nome": "História em Conjunto",
+   "tipo": "historia",
+   "niveis": [
+    "basico",
+    "intermediario"
+   ],
+   "explicacao": "Eu darei o início de uma história. Vocês devem continuá-la, um de cada vez.",
+   "conteudo": [
+    {
+     "en": "A penguin walked into the room carrying a briefcase.",
+     "pt": "Um pinguim entrou na sala carregando uma maleta."
+    },
+    {
+     "en": "Yesterday, my neighbor's dog started speaking Spanish.",
+     "pt": "Ontem, o cachorro do meu vizinho começou a falar espanhol."
+    },
+    {
+     "en": "It was midnight when the refrigerator began to sing.",
+     "pt": "Era meia-noite quando a geladeira começou a cantar."
+    },
+    {
+     "en": "A tiny dragon was sitting on my keyboard this morning.",
+     "pt": "Um dragãozinho estava sentado no meu teclado hoje de manhã."
+    },
+    {
+     "en": "The bus stopped in the middle of the ocean.",
+     "pt": "O ônibus parou no meio do oceano."
+    },
+    {
+     "en": "Someone left a giant egg in front of my door.",
+     "pt": "Alguém deixou um ovo gigante na frente da minha porta."
+    },
+    {
+     "en": "When I opened the closet, a monkey in a suit said hello.",
+     "pt": "Quando abri o armário, um macaco de terno disse olá."
+    },
+    {
+     "en": "Our teacher turned into a cat during the lesson.",
+     "pt": "Nosso professor virou um gato durante a aula."
+    },
+    {
+     "en": "The supermarket was empty, except for a man dressed as a banana.",
+     "pt": "O supermercado estava vazio, exceto por um homem fantasiado de banana."
+    },
+    {
+     "en": "I found a map in my soup.",
+     "pt": "Encontrei um mapa na minha sopa."
+    },
+    {
+     "en": "The moon fell into our backyard last night.",
+     "pt": "A lua caiu no nosso quintal ontem à noite."
+    },
+    {
+     "en": "A robot knocked on the door and asked for a cup of sugar.",
+     "pt": "Um robô bateu na porta e pediu uma xícara de açúcar."
+    },
+    {
+     "en": "Everyone in the city woke up with blue hair.",
+     "pt": "Todos na cidade acordaram com o cabelo azul."
+    },
+    {
+     "en": "There was a mysterious letter inside my shoe.",
+     "pt": "Havia uma carta misteriosa dentro do meu sapato."
+    },
+    {
+     "en": "The elevator went up, up, up, and never stopped.",
+     "pt": "O elevador subiu, subiu, subiu e nunca parou."
+    },
+    {
+     "en": "A little octopus asked me for directions to the airport.",
+     "pt": "Um polvinho me pediu informações de como chegar ao aeroporto."
+    },
+    {
+     "en": "My phone rang, and it was my grandmother from the year 1950.",
+     "pt": "Meu celular tocou, e era minha avó do ano de 1950."
+    },
+    {
+     "en": "On the first day of summer, it started to snow pizza.",
+     "pt": "No primeiro dia do verão, começou a nevar pizza."
+    },
+    {
+     "en": "The pirate lost his map, so he asked the tourists for help.",
+     "pt": "O pirata perdeu o mapa, então pediu ajuda aos turistas."
+    },
+    {
+     "en": "I sat on a bench, and the bench started to run.",
+     "pt": "Sentei em um banco, e o banco começou a correr."
+    }
+   ]
+  },
+  {
+   "id": "quemsou",
+   "nome": "Quem sou eu?",
+   "tipo": "quemsou",
+   "niveis": [
+    "basico",
+    "intermediario"
+   ],
+   "explicacao": "Você sabe a identidade de todos, menos a sua. Faça perguntas de sim e não para descobrir quem você é.",
+   "conteudo": [
+    {
+     "en": "Pizza",
+     "pt": "Pizza"
+    },
+    {
+     "en": "Elephant",
+     "pt": "Elefante"
+    },
+    {
+     "en": "Spider-Man",
+     "pt": "Homem-Aranha"
+    },
+    {
+     "en": "The Moon",
+     "pt": "A Lua"
+    },
+    {
+     "en": "Santa Claus",
+     "pt": "Papai Noel"
+    },
+    {
+     "en": "Mickey Mouse",
+     "pt": "Mickey Mouse"
+    },
+    {
+     "en": "Harry Potter",
+     "pt": "Harry Potter"
+    },
+    {
+     "en": "Batman",
+     "pt": "Batman"
+    },
+    {
+     "en": "Pikachu",
+     "pt": "Pikachu"
+    },
+    {
+     "en": "Shrek",
+     "pt": "Shrek"
+    },
+    {
+     "en": "Cristiano Ronaldo",
+     "pt": "Cristiano Ronaldo"
+    },
+    {
+     "en": "Lionel Messi",
+     "pt": "Lionel Messi"
+    },
+    {
+     "en": "Neymar",
+     "pt": "Neymar"
+    },
+    {
+     "en": "Michael Jackson",
+     "pt": "Michael Jackson"
+    },
+    {
+     "en": "Barack Obama",
+     "pt": "Barack Obama",
+     "niveis": [
+      "intermediario"
+     ]
+    },
+    {
+     "en": "Albert Einstein",
+     "pt": "Albert Einstein",
+     "niveis": [
+      "intermediario"
+     ]
+    },
+    {
+     "en": "Toothbrush",
+     "pt": "Escova de dentes"
+    },
+    {
+     "en": "Refrigerator",
+     "pt": "Geladeira"
+    },
+    {
+     "en": "Umbrella",
+     "pt": "Guarda-chuva"
+    },
+    {
+     "en": "Banana",
+     "pt": "Banana"
+    },
+    {
+     "en": "Giraffe",
+     "pt": "Girafa"
+    },
+    {
+     "en": "Penguin",
+     "pt": "Pinguim"
+    },
+    {
+     "en": "Dolphin",
+     "pt": "Golfinho"
+    },
+    {
+     "en": "Coffee",
+     "pt": "Café"
+    },
+    {
+     "en": "Hamburger",
+     "pt": "Hambúrguer"
+    },
+    {
+     "en": "Airplane",
+     "pt": "Avião"
+    },
+    {
+     "en": "Television",
+     "pt": "Televisão"
+    },
+    {
+     "en": "Mirror",
+     "pt": "Espelho"
+    },
+    {
+     "en": "Guitar",
+     "pt": "Violão"
+    },
+    {
+     "en": "Bicycle",
+     "pt": "Bicicleta"
+    },
+    {
+     "en": "Snowman",
+     "pt": "Boneco de neve"
+    },
+    {
+     "en": "Pirate",
+     "pt": "Pirata"
+    },
+    {
+     "en": "Superman",
+     "pt": "Super-Homem"
+    },
+    {
+     "en": "Wonder Woman",
+     "pt": "Mulher-Maravilha"
+    },
+    {
+     "en": "Cinderella",
+     "pt": "Cinderela"
+    },
+    {
+     "en": "Spiderweb",
+     "pt": "Teia de aranha"
+    },
+    {
+     "en": "Soccer ball",
+     "pt": "Bola de futebol"
+    },
+    {
+     "en": "Chocolate",
+     "pt": "Chocolate"
+    },
+    {
+     "en": "Dragon",
+     "pt": "Dragão"
+    },
+    {
+     "en": "Robot",
+     "pt": "Robô"
+    }
+   ]
+  }
+ ]
+}

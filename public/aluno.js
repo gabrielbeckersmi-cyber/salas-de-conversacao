@@ -176,6 +176,8 @@
       snap = m.data;
       offset = snap.now - Date.now();
       render();
+    } else if (m.type === 'dyn') {
+      if (snap && snap.room && m.roomId === snap.room.id) dynSet(m.data);
     } else if (m.type === 'chat') {
       if (m.roomId === 'lobby') addLobbyChat(m.msg);
       else if (snap && snap.room && m.roomId === snap.room.id) addChat(m.msg);
@@ -184,7 +186,7 @@
 
   // ---------- chat da sala ----------
   var chat = { roomId: null, list: [], ids: new Set() };
-  var chatOpen = true;
+  var dynSeen = false;        // o aluno já abriu as Dinâmicas?
   var chatUnread = 0;
   var chatTab = 'chat';       // 'chat' | 'tr'
   var trSeen = false;         // o aluno já abriu o tradutor nesta rodada?
@@ -192,50 +194,40 @@
   function chatNearBottom() { return chatListEl.scrollHeight - chatListEl.scrollTop - chatListEl.clientHeight < 60; }
   function chatHTML(m) {
     var mine = snap && snap.me && m.pid === snap.me.pid;
-    if (m.from === 'professor') return '<div class="cm prof"><span class="who">Professor' + (m.name && m.name !== 'Professor' ? ' · ' + A.esc(m.name) : '') + '</span>' + A.esc(m.text) + '</div>';
-    return '<div class="cm' + (mine ? ' me' : '') + '"><span class="who">' + A.esc(mine ? 'Você' : m.name) + '</span>' + A.esc(m.text) + '</div>';
+    var say = m.speak ? '<button class="say" type="button" data-say="' + A.esc(m.text) + '" aria-label="Ouvir a pronúncia" title="Ouvir a pronúncia">\uD83D\uDD0A</button>' : '';
+    if (m.from === 'professor') return '<div class="cm prof"><span class="who">Professor' + (m.name && m.name !== 'Professor' ? ' · ' + A.esc(m.name) : '') + '</span>' + A.esc(m.text) + say + '</div>';
+    return '<div class="cm' + (mine ? ' me' : '') + '"><span class="who">' + A.esc(mine ? 'Você' : m.name) + '</span>' + A.esc(m.text) + say + '</div>';
   }
   function renderChat(stick) {
     chatListEl.innerHTML = chat.list.length ? chat.list.map(chatHTML).join('') : '<p class="none">Nenhuma mensagem ainda.</p>';
     if (stick) chatListEl.scrollTop = chatListEl.scrollHeight;
   }
   function paintChatToggle() {
-    var b = $('l-chat-toggle');
-    $('l-chat-body').hidden = !chatOpen;
-    b.setAttribute('aria-expanded', String(chatOpen));
-    b.textContent = chatOpen ? 'Esconder' : (chatUnread ? 'Mostrar · ' + chatUnread + (chatUnread === 1 ? ' nova' : ' novas') : 'Mostrar');
-    $('l-chat').classList.toggle('chat-new', chatUnread > 0 && (!chatOpen || chatTab !== 'chat'));
-    $('tab-chat').classList.toggle('on', chatTab === 'chat');
-    $('tab-tr').classList.toggle('on', chatTab === 'tr');
-    $('tab-chat').setAttribute('aria-selected', String(chatTab === 'chat'));
-    $('tab-tr').setAttribute('aria-selected', String(chatTab === 'tr'));
+    $('l-chat').classList.toggle('chat-new', chatUnread > 0 && chatTab !== 'chat');
+    ['chat', 'tr', 'dyn'].forEach(function (t) {
+      $('tab-' + t).classList.toggle('on', chatTab === t);
+      $('tab-' + t).setAttribute('aria-selected', String(chatTab === t));
+      $('pane-' + t).hidden = chatTab !== t;
+    });
     $('tab-tr').classList.toggle('nudge', !trSeen);
-    $('pane-chat').hidden = chatTab !== 'chat';
-    $('pane-tr').hidden = chatTab !== 'tr';
+    $('tab-dyn').classList.toggle('nudge', !dynSeen);
   }
-  $('l-chat-toggle').addEventListener('click', function () {
-    chatOpen = !chatOpen;
-    if (chatOpen && chatTab === 'chat') { chatUnread = 0; }
-    if (chatOpen && chatTab === 'tr') trSeen = true;
-    paintChatToggle();
-    if (chatOpen) chatListEl.scrollTop = chatListEl.scrollHeight;
-  });
   function setTab(t) {
     chatTab = t;
-    chatOpen = true;
-    if (t === 'chat') chatUnread = 0; else trSeen = true;
+    if (t === 'chat') chatUnread = 0; else if (t === 'tr') trSeen = true; else dynSeen = true;
     paintChatToggle();
     if (t === 'chat') chatListEl.scrollTop = chatListEl.scrollHeight;
-    else setTimeout(function () { try { $('tr-in').focus({ preventScroll: true }); } catch (e) { /* ignorar */ } }, 30);
+    else if (t === 'tr') setTimeout(function () { try { $('tr-in').focus({ preventScroll: true }); } catch (e) { /* ignorar */ } }, 30);
   }
   $('tab-chat').addEventListener('click', function () { setTab('chat'); });
   $('tab-tr').addEventListener('click', function () { setTab('tr'); });
+  $('tab-dyn').addEventListener('click', function () { setTab('dyn'); });
   function addChat(m) {
     if (chat.ids.has(m.id)) return;
     chat.ids.add(m.id);
     chat.list.push(m);
     var mine = snap && m.pid === snap.me.pid;
-    if ((!chatOpen || chatTab !== 'chat') && !mine) { chatUnread++; paintChatToggle(); }
+    if (chatTab !== 'chat' && !mine) { chatUnread++; paintChatToggle(); }
     var stick = chatNearBottom() || mine;
     renderChat(stick);
   }
@@ -245,7 +237,8 @@
     if (id === chat.roomId) return;
     chat = { roomId: id, list: [], ids: new Set() };
     chatUnread = 0;
-    trSeen = false;   // sala nova: o Tradutor volta a piscar para lembrar do recurso
+    trSeen = false;   // sala nova: o Tradutor e as Dinâmicas voltam a piscar para lembrar dos recursos
+    dynSeen = false;
     paintChatToggle();
     renderChat(true);
     if (!id || !session) return;
@@ -817,6 +810,7 @@
     $('l-cancel').hidden = !r.calling;
     syncTiles();
     syncChat();
+    syncDyn();
     tickTimer();
   }
 
@@ -1128,6 +1122,37 @@
       trPaint();
     });
   }
+  var ttsVoice = null;
+  function pickVoice() {
+    try {
+      var vs = window.speechSynthesis.getVoices();
+      ttsVoice = vs.filter(function (x) { return /^en[-_]US/i.test(x.lang); })[0] || vs.filter(function (x) { return /^en/i.test(x.lang); })[0] || ttsVoice;
+    } catch (e) { /* ignorar */ }
+  }
+  // Aquece a voz antes de precisar: carrega a lista de vozes e fala uma frase muda,
+  // para o primeiro "ouvir" não demorar vários segundos.
+  var ttsWarm = false;
+  function warmTTS(withUtterance) {
+    if (!('speechSynthesis' in window)) return;
+    pickVoice();
+    if (withUtterance && !ttsWarm) {
+      ttsWarm = true;
+      try {
+        var u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0; u.lang = 'en-US';
+        if (ttsVoice) u.voice = ttsVoice;
+        window.speechSynthesis.speak(u);
+      } catch (e) { /* ignorar */ }
+    }
+  }
+  if ('speechSynthesis' in window) {
+    pickVoice();
+    try { window.speechSynthesis.addEventListener('voiceschanged', pickVoice); } catch (e) { /* ignorar */ }
+    ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) {
+      window.addEventListener(ev, function once() { window.removeEventListener(ev, once, true); warmTTS(true); }, true);
+    });
+    setTimeout(function () { warmTTS(true); }, 800);   // navegadores que permitem sem toque
+  }
   function trSpeak(text) {
     if (!text || !('speechSynthesis' in window)) return;
     try {
@@ -1135,12 +1160,15 @@
       var u = new SpeechSynthesisUtterance(text);
       u.lang = 'en-US';
       u.rate = 0.95;
-      var vs = window.speechSynthesis.getVoices();
-      var v = vs.filter(function (x) { return /^en[-_]US/i.test(x.lang); })[0] || vs.filter(function (x) { return /^en/i.test(x.lang); })[0];
-      if (v) u.voice = v;
+      if (!ttsVoice) pickVoice();
+      if (ttsVoice) u.voice = ttsVoice;
       window.speechSynthesis.speak(u);
     } catch (e) { /* ignorar */ }
   }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-say]') : null;
+    if (b) trSpeak(b.getAttribute('data-say'));
+  });
   $('tr-go').addEventListener('click', trDo);
   $('tr-in').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); trDo(); } });
   $('tr-in').addEventListener('input', function () { if (trDir === 'en-pt') trPaint(); });
@@ -1160,14 +1188,114 @@
     var text = (b.getAttribute('data-box') === 'in' ? $('tr-in').value : $('tr-out').textContent).trim();
     if (!text) return;
     if (b.getAttribute('data-tr') === 'say') { trSpeak(text); return; }
-    A.copyText(text).then(function (ok) {
-      var old = b.textContent;
-      b.textContent = ok ? 'Copiado!' : 'Copie manualmente';
-      setTimeout(function () { b.textContent = old; }, 1500);
+    if (!session) return;
+    var old = b.textContent;
+    b.disabled = true;
+    A.api('POST', '/api/classes/' + encodeURIComponent(classId) + '/chat', { studentId: session.studentId, text: text, speak: true }).then(function () {
+      b.textContent = 'Enviado!';
+      setTab('chat');
+      setTimeout(function () { b.textContent = old; b.disabled = false; }, 1200);
+    }, function (ex) {
+      b.textContent = old; b.disabled = false;
+      setWarn(ex.message, false);
+      setTimeout(function () { setWarn(null); }, 3000);
     });
   });
   if (!('speechSynthesis' in window)) { document.querySelectorAll('[data-tr="say"]').forEach(function (b) { b.hidden = true; }); }
   trPaint();
+
+  // ---------- dinâmicas da sala ----------
+  var dyn = { key: null, data: null, trv: -1, fetched: 0, tick: 0 };
+  var dynEl = $('dyn-body');
+  var dynBusy = false;
+  function dynSet(d) {
+    var changed = !dyn.data || d.v !== dyn.data.v;
+    if (changed && dyn.data && chatTab !== 'dyn') { dynSeen = false; paintChatToggle(); }
+    dyn.data = d;
+    dyn.recv = Date.now();
+    dyn.fetched = Date.now();
+    dynPaint();
+  }
+  function syncDyn() {
+    var key = snap && snap.room ? snap.round + ':' + snap.room.id : null;
+    if (key !== dyn.key) { dyn = { key: key, data: null, trv: -1, fetched: 0, tick: dyn.tick }; dynPaint(); }
+    if (!key || !session) return;
+    if (Date.now() - dyn.fetched < 15000) return;
+    dyn.fetched = Date.now();
+    A.api('GET', '/api/classes/' + encodeURIComponent(classId) + '/dyn?studentId=' + encodeURIComponent(session.studentId)).then(function (r) {
+      if (dyn.key === key && r.data) dynSet(r.data);
+    }, function () { /* ignorar */ });
+  }
+  function dynAct(action) {
+    if (!session || dynBusy) return;
+    dynBusy = true;
+    A.api('POST', '/api/classes/' + encodeURIComponent(classId) + '/dyn', { studentId: session.studentId, action: action }).then(function () { dynBusy = false; }, function (ex) {
+      dynBusy = false;
+      setWarn(ex.message, false);
+      setTimeout(function () { setWarn(null); }, 3000);
+    });
+  }
+  function ptLine(x, show) { return show && x && x.pt ? '<p class="pt">' + A.esc(x.pt) + '</p>' : ''; }
+  function dynPaint() {
+    var d = dyn.data;
+    if (!snap || !snap.room) { dynEl.innerHTML = '<p class="none">As dinâmicas aparecem quando você estiver em uma sala.</p>'; return; }
+    if (!d || d.empty) { dynEl.innerHTML = '<p class="none">' + (d ? 'Nenhuma dinâmica disponível.' : 'Carregando…') + '</p>'; return; }
+    var show = dyn.trv === d.v;
+    var h = '<h3>' + A.esc(d.nome) + '</h3>';
+    var hasEn = false;
+    if (!d.started) {
+      h += '<p class="expl">' + A.esc(d.explicacao) + '</p><div class="btnrow">' +
+        (d.outras ? '<button class="btn" data-dyn="next" type="button">Sortear outra</button>' : '<span></span>') +
+        '<button class="btn btn-primary" data-dyn="start" type="button">Iniciar</button></div>';
+      dynEl.innerHTML = h;
+      return;
+    }
+    if (d.tipo === 'impostor') {
+      hasEn = !d.impostor;
+      h += '<p class="small">Categoria: <b>' + A.esc(d.categoria.pt) + '</b> (' + A.esc(d.categoria.en) + ')</p>';
+      if (d.impostor && !d.revelado) h += '<div class="box imp"><span class="lbl">Só você vê isto</span><span class="big">Você é o IMPOSTOR</span><span>Fale uma frase sem deixar claro que você não sabe a palavra.</span></div>';
+      else h += '<div class="box"><span class="lbl">A palavra é</span><span class="big">' + A.esc(d.palavra.en) + '</span>' + ptLine(d.palavra, show) + '</div>';
+      if (d.revelado) h += '<div class="box imp"><span class="lbl">O impostor era</span><span class="big">' + A.esc(d.nomeImpostor) + '</span></div>';
+      else h += '<button class="btn" data-dyn="reveal" type="button">Revelar o impostor</button>';
+      if (!d.impostor && !d.revelado) h += '<p class="small">Cada um fala uma frase em inglês que ajude a entender a palavra, sem dizê-la.</p>';
+    } else if (d.tipo === 'mimica') {
+      hasEn = true;
+      h += '<div class="box"><span class="lbl">Sua palavra (só você vê)</span><span class="big">' + A.esc(d.palavra.en) + '</span>' + ptLine(d.palavra, show) + '</div>';
+      h += '<div class="dtimer" id="dyn-timer" role="timer"></div><button class="btn btn-primary" id="dyn-mim" data-dyn="mimica" type="button">Começar ' + d.segundos + ' segundos</button>';
+    } else if (d.tipo === 'quemsou') {
+      hasEn = true;
+      h += '<p class="small">Você vê quem os outros são. Descubra quem é você com perguntas de sim ou não.</p><div class="who-list">' +
+        d.outros.map(function (o) { return '<div class="box"><span class="lbl">' + A.esc(o.nome) + ' é</span><b>' + A.esc(o.id.en) + '</b>' + ptLine(o.id, show) + '</div>'; }).join('') + '</div>';
+      if (!d.outros.length) h += '<p class="none">Ainda não há outros jogadores na sala.</p>';
+    } else {
+      hasEn = true;
+      h += '<div class="box"><span class="lbl">' + (d.tipo === 'leilao' ? 'Objeto à venda' : 'Início da história') + '</span><span class="big" style="font-size:' + (d.tipo === 'leilao' ? 28 : 22) + 'px">' + A.esc(d.item.en) + '</span>' + ptLine(d.item, show) + '</div>';
+      h += '<p class="small">' + (d.tipo === 'leilao' ? 'Escolham quem vai vender. Ele(a) convence os outros a comprar.' : 'Continuem a história, um de cada vez, em inglês.') + '</p>';
+    }
+    if (hasEn && !show) h += '<button class="btn btn-sm" data-dyn="trans" type="button">Ver tradução</button>';
+    h += '<div class="btnrow"><button class="btn" data-dyn="again" type="button">Brincar novamente</button>' +
+      (d.outras ? '<button class="btn" data-dyn="next" type="button">Sortear outra</button>' : '<span></span>') + '</div>';
+    dynEl.innerHTML = h;
+    dynTimerPaint();
+  }
+  function dynTimerPaint() {
+    var d = dyn.data, t = $('dyn-timer'), b = $('dyn-mim');
+    if (!t || !d) return;
+    var left = d.endsAt ? Math.ceil((d.endsAt - (Date.now() + (d.now - dyn.recv))) / 1000) : null;
+    if (left == null || left <= -3) { t.textContent = d.segundos + 's'; t.classList.remove('low'); if (b) b.disabled = false; return; }
+    if (left <= 0) { t.textContent = 'Acabou o tempo!'; t.classList.add('low'); if (b) b.disabled = false; return; }
+    t.textContent = A.mmss(left);
+    t.classList.toggle('low', left <= 5);
+    if (b) b.disabled = true;
+  }
+  dynEl.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-dyn]') : null;
+    if (!b) return;
+    var a = b.getAttribute('data-dyn');
+    if (a === 'trans') { dyn.trv = dyn.data.v; dynPaint(); return; }
+    dynAct(a);
+  });
+  setInterval(function () { if (dyn.data && dyn.data.tipo === 'mimica' && chatTab === 'dyn') dynTimerPaint(); }, 250);
 
   // ---------- início ----------
   function init() {

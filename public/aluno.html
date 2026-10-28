@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="/shared.css">
 <style>
-  .wrap { max-width: 980px; margin: 0 auto; padding: 44px 16px calc(48px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 20px; }
-  .brand { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 10px 16px calc(40px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; }
+  .brand { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .netbar { background: var(--call-bg); color: var(--call); border: 1px solid var(--call-line); border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
   .card h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
   .card h2 { font-size: 17px; font-weight: 600; }
@@ -68,7 +68,7 @@
   .chat h2 { font-size: 16px; font-weight: 600; }
   .chat-body { display: flex; flex-direction: column; gap: 12px; }
   .chat-body[hidden] { display: none; }
-  .chat-list { display: flex; flex-direction: column; gap: 8px; height: 220px; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+  .chat-list { display: flex; flex-direction: column; gap: 8px; height: 220px; overflow-y: auto; padding-right: 2px; touch-action: pan-y; }
   .chat-list .none { color: var(--ink-2); font-size: 14px; }
   .cm { max-width: 92%; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; align-self: flex-start; }
   .cm .who { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 2px; }
@@ -83,13 +83,32 @@
   @media (prefers-reduced-motion: reduce) { .chat-new .chat-toggle { animation: none; } }
   .endmsg { white-space: pre-line; }
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-  .tab { font: inherit; font-weight: 600; font-size: 15px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer; min-height: 36px; }
+  .tab { font: inherit; font-weight: 600; font-size: 14px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer; min-height: 36px; }
   .tab.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
   .tab:focus-visible { outline: 2px solid var(--inter); outline-offset: 2px; }
+  .pane-dyn-fix {}
   .tab.nudge:not(.on) { animation: tabnudge 1.4s ease-in-out infinite; border-color: var(--call-line); background: var(--call-bg); color: var(--call); }
   .chat-new #tab-chat:not(.on) { animation: chatpulse 1.2s ease-in-out infinite; background: var(--live); border-color: var(--live); color: var(--on-live); }
   @keyframes tabnudge { 0%, 100% { box-shadow: 0 0 0 0 rgba(226, 167, 60, 0.7); transform: scale(1); } 50% { box-shadow: 0 0 0 7px rgba(226, 167, 60, 0); transform: scale(1.06); } }
   @media (prefers-reduced-motion: reduce) { .tab.nudge:not(.on), .chat-new #tab-chat:not(.on) { animation: none; } }
+  .dyn { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; min-height: 0; flex: 1; touch-action: pan-y; }
+  .dyn h3 { font-family: var(--font-display); font-size: 22px; font-weight: 700; line-height: 1.15; }
+  .dyn .expl { font-size: 16px; line-height: 1.45; color: var(--ink); }
+  .dyn .btnrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dyn .btnrow .btn { min-height: 44px; }
+  .dyn .big { font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1.15; overflow-wrap: anywhere; }
+  .dyn .box { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .dyn .box.imp { background: var(--live-bg); border-color: var(--live); color: var(--live); }
+  .dyn .lbl { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
+  .dyn .pt { font-size: 16px; font-style: italic; color: var(--ink-2); }
+  .dyn .who-list { display: flex; flex-direction: column; gap: 8px; }
+  .dyn .who-list .box { padding: 8px 12px; }
+  .dyn .who-list b { font-size: 20px; }
+  .dyn .dtimer { font-family: var(--font-mono); font-weight: 600; font-size: 44px; text-align: center; }
+  .dyn .dtimer.low { color: var(--live); animation: dpulse 0.8s steps(2, jump-none) infinite; }
+  @keyframes dpulse { 50% { opacity: 0.35; } }
+  .cm .say { font: inherit; border: 0; background: transparent; cursor: pointer; font-size: 18px; padding: 0 4px; margin-left: 4px; vertical-align: middle; border-radius: 6px; }
+  .cm .say:hover, .cm .say:focus-visible { background: rgba(0,0,0,0.12); outline: 2px solid var(--inter); }
   .pane { display: flex; flex-direction: column; gap: 12px; }
   .pane[hidden] { display: none; }
   .tr-dir { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 14px; }
@@ -129,7 +148,7 @@
   .live-body, .live-main, .live-side { display: contents; }
   @media (min-width: 900px) and (min-height: 560px) {
     body.in-live { overflow: hidden; padding-block: 0; }
-    body.in-live .wrap { max-width: none; height: 100vh; height: 100dvh; overflow: hidden; padding: 52px 20px 16px; gap: 10px; box-sizing: border-box; }
+    body.in-live .wrap { max-width: none; height: 100vh; height: 100dvh; overflow: hidden; padding: 10px 20px 12px; gap: 10px; box-sizing: border-box; }
     body.in-live .brand, body.in-live .netbar { flex: none; }
     body.in-live #live { flex: 1; min-height: 0; gap: 10px; }
     body.in-live .live-top { flex: none; }
@@ -270,8 +289,8 @@
               <div class="tabs" role="tablist">
                 <button class="tab on" id="tab-chat" role="tab" aria-selected="true" aria-controls="pane-chat" type="button">Chat da sala</button>
                 <button class="tab tab-tr nudge" id="tab-tr" role="tab" aria-selected="false" aria-controls="pane-tr" type="button">Tradutor</button>
+                <button class="tab tab-dyn nudge" id="tab-dyn" role="tab" aria-selected="false" aria-controls="pane-dyn" type="button">Dinâmicas</button>
               </div>
-              <button class="btn btn-sm chat-toggle" id="l-chat-toggle" type="button" aria-expanded="true">Esconder</button>
             </div>
             <div class="chat-body" id="l-chat-body">
               <div class="pane" id="pane-chat" role="tabpanel">
@@ -290,7 +309,7 @@
                 <div class="tr-box">
                   <textarea class="input" id="tr-in" rows="3" maxlength="450" placeholder="Escreva aqui em português…" aria-label="Texto para traduzir"></textarea>
                   <div class="tr-tools" id="tr-in-tools" hidden>
-                    <button class="btn btn-sm" data-tr="copy" data-box="in" type="button">Copiar</button>
+                    <button class="btn btn-sm" data-tr="send" data-box="in" type="button">Enviar no chat</button>
                     <button class="btn btn-sm" data-tr="say" data-box="in" type="button">Ouvir</button>
                   </div>
                 </div>
@@ -298,10 +317,13 @@
                 <div class="tr-box">
                   <div class="tr-out" id="tr-out" aria-live="polite" tabindex="0"></div>
                   <div class="tr-tools" id="tr-out-tools" hidden>
-                    <button class="btn btn-sm" data-tr="copy" data-box="out" type="button">Copiar</button>
+                    <button class="btn btn-sm" data-tr="send" data-box="out" type="button">Enviar no chat</button>
                     <button class="btn btn-sm" data-tr="say" data-box="out" type="button">Ouvir</button>
                   </div>
                 </div>
+              </div>
+              <div class="pane" id="pane-dyn" role="tabpanel" hidden>
+                <div class="dyn" id="dyn-body"></div>
               </div>
             </div>
           </section>

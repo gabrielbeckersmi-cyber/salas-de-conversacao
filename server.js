@@ -7,6 +7,7 @@ const express = require('express');
 const { WebSocketServer } = require('ws');
 const { AccessToken } = require('livekit-server-sdk');
 const C = require('./lib/classes');
+const D = require('./lib/dinamicas');
 const auth = require('./lib/auth');
 const R = require('./lib/report');
 const { ReportStore } = require('./lib/reportstore');
@@ -283,8 +284,40 @@ function build(env) {
     const c = getClass(req.params.id);
     const s = c.students[String(req.body.studentId)];
     if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.');
-    const r = C.studentSay(c, s, req.body.text);
+    const r = C.studentSay(c, s, req.body.text, req.body.speak === true);
     sendChat(c, r.roomId, r.msg);
+    res.json({ ok: true });
+  });
+
+
+  // ---------- dinâmicas da sala ----------
+  function dynRoom(c, studentId) {
+    const s = c.students[String(studentId)];
+    if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.');
+    const room = C.isLive(c) ? C.roomOf(c, s.pid) : null;
+    return { s: s, room: room };
+  }
+  function pushDyn(c, room) {
+    const r = reg(c.id);
+    const now = Date.now();
+    room.members.forEach(function (pid) {
+      const st = C.byPid(c, pid);
+      const set = st && r.students.get(st.id);
+      if (set) set.forEach(function (ws) { send(ws, { type: 'dyn', roomId: room.id, data: D.view(c, room, pid, now) }); });
+    });
+    save();
+  }
+  app.get('/api/classes/:id/dyn', function (req, res) {
+    const c = getClass(req.params.id);
+    const x = dynRoom(c, req.query.studentId);
+    res.json({ roomId: x.room ? x.room.id : null, data: x.room ? D.view(c, x.room, x.s.pid, Date.now()) : null });
+  });
+  app.post('/api/classes/:id/dyn', function (req, res) {
+    const c = getClass(req.params.id);
+    const x = dynRoom(c, req.body.studentId);
+    if (!x.room) throw new C.AppError(409, 'no-room', 'Você ainda não está em uma sala.');
+    D.act(c, x.room, String(req.body.action || ''), Date.now());
+    pushDyn(c, x.room);
     res.json({ ok: true });
   });
 
