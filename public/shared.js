@@ -128,6 +128,29 @@ window.App = (function () {
   // Alerta visual dos últimos 30 segundos de qualquer contagem regressiva:
   // faixa vermelha grande no topo + borda da tela piscando. urgent('texto') liga, urgent(null) desliga.
   var urgentEl = null;
+  var actx = null;
+  function unlockAudio() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+    } catch (e) { /* ignorar */ }
+  }
+  ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, unlockAudio, { passive: true }); });
+  // três bipes curtos quando entra nos 30 segundos finais
+  function beep() {
+    if (!actx || actx.state !== 'running') return;
+    try {
+      [0, 0.28, 0.56].forEach(function (dt) {
+        var t = actx.currentTime + dt, o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'sine'; o.frequency.value = 988;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+        o.connect(g); g.connect(actx.destination);
+        o.start(t); o.stop(t + 0.22);
+      });
+    } catch (e) { /* ignorar */ }
+  }
   function urgent(text) {
     if (!urgentEl) {
       urgentEl = document.createElement('div');
@@ -137,6 +160,7 @@ window.App = (function () {
       document.body.appendChild(urgentEl);
     }
     if (text) {
+      if (!document.body.classList.contains('urgent')) beep();
       if (urgentEl.textContent !== text) urgentEl.textContent = text;
       urgentEl.hidden = false;
       document.body.classList.add('urgent');

@@ -87,3 +87,11 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 - Jogos: Impostor (cada um vê só o seu papel), Mímica (palavra privada + cronômetro de 30 s igual para todos), Leilão Maluco, História em Conjunto e Quem sou eu? (você vê os outros, não a si mesmo). **Ver tradução** aparece quando há inglês e some depois de usado.
 - Conteúdo: `lib/dinamicas.json`. O campo `"niveis": ["intermediario"]` (na dinâmica ou em cada item) limita aquele conteúdo a salas só de intermediário; sem o campo vale para todos. Reinicie o servidor depois de editar. Para criar um jogo novo é preciso um dos 5 tipos (`impostor`, `mimica`, `leilao`, `historia`, `quemsou`).
 - Também: câmeras aparecem inteiras (sem corte), menos espaço no topo, scroll da página não trava mais no chat e a voz do "Ouvir" é aquecida na sala de espera.
+
+## Versão de 28/10 (3): ajustes de tela e Atividades
+- Sua própria câmera aparece espelhada (como espelho); os outros te veem normalmente.
+- Computador: a sala de espera fica como as salas (câmeras à esquerda; chat e jogo à direita). Celular não mudou.
+- Contagem dos 30 s finais: sem faixa; borda piscando, número vermelho pulsando e 3 bipes ao entrar nessa fase (o som só toca depois que a pessoa tocou na tela uma vez).
+- Botões Microfone/Câmera com interruptor (aceso e à direita = ligado).
+- Sala de espera: câmeras se redimensionam para caber todos no mesmo espaço, sem rolagem; chat com botão Esconder; temas menores.
+- Aba **Atividades** com **Dinâmicas** e **Perguntas**. Perguntas vêm de `lib/perguntas.json` (228, nenhuma de sim/não), a mesma para toda a sala, com "Sortear outra pergunta" e "Ver tradução".

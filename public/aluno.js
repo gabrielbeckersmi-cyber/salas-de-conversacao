@@ -54,6 +54,7 @@
   A.topctl().insertBefore(leaveBtn, A.topctl().firstChild);
   function showOnly(which) {
     document.body.classList.toggle('in-live', which === 'live');
+    document.body.classList.toggle('in-wait', which === 'waiting');
     if (which === 'screen') A.urgent(null);
     leaveBtn.hidden = which === 'screen';
     screenEl.hidden = which !== 'screen';
@@ -613,6 +614,7 @@
     t.el.classList.toggle('mic-off', !mic || mic.isMuted);
   }
 
+  function sw(on) { return '<span class="sw' + (on ? ' on' : '') + '" aria-hidden="true"><i></i></span>'; }
   function updateControls() {
     if (!live) return;
     var lp = live.room.localParticipant;
@@ -620,10 +622,12 @@
     var camOn = lp.isCameraEnabled;
     var mic = $('l-mic');
     var cam = $('l-cam');
-    mic.innerHTML = (micOn ? A.ICON.mic : A.ICON.micoff) + (micOn ? 'Microfone ligado' : 'Microfone desligado');
+    mic.innerHTML = (micOn ? A.ICON.mic : A.ICON.micoff) + 'Microfone' + sw(micOn);
     mic.className = 'btn btn-live';
     mic.setAttribute('aria-pressed', String(!micOn));
-    cam.innerHTML = A.ICON.cam + (camOn ? 'Câmera ligada' : 'Câmera desligada');
+    mic.setAttribute('aria-label', micOn ? 'Microfone ligado. Toque para desligar' : 'Microfone desligado. Toque para ligar');
+    cam.setAttribute('aria-label', camOn ? 'Câmera ligada. Toque para desligar' : 'Câmera desligada. Toque para ligar');
+    cam.innerHTML = A.ICON.cam + 'Câmera' + sw(camOn);
     cam.className = 'btn btn-live';
     cam.setAttribute('aria-pressed', String(!camOn));
   }
@@ -862,7 +866,25 @@
   var lobbyAudio = $('lobby-audio');
 
   function lobbyWarn(text) { var w = $('lb-warn'); w.hidden = !text; w.textContent = text || ''; }
-  function lobbyCount() { $('lobby-count').textContent = lTiles.size ? '· ' + lTiles.size + (lTiles.size === 1 ? ' pessoa' : ' pessoas') : ''; }
+  // os quadradinhos mudam de tamanho para caber todo mundo no mesmo espaço, sem barra de rolagem
+  function fitLobbyTiles() {
+    var el = lobbyTilesEl, n = el.children.length;
+    if (!n || !el.clientWidth || !el.clientHeight) return;
+    var W = el.clientWidth, H = el.clientHeight, gap = 8, best = 0, bc = 1;
+    for (var c = 1; c <= n; c++) {
+      var rows = Math.ceil(n / c);
+      var w = (W - gap * (c - 1)) / c;
+      var h = w * 3 / 4;
+      if (h * rows + gap * (rows - 1) > H) { h = (H - gap * (rows - 1)) / rows; w = h * 4 / 3; }
+      if (w > best) { best = w; bc = c; }
+    }
+    best = Math.max(40, Math.min(best, 300));
+    el.style.gridTemplateColumns = 'repeat(' + bc + ', ' + Math.floor(best) + 'px)';
+    el.style.gridAutoRows = Math.floor(best * 3 / 4) + 'px';
+  }
+  if (window.ResizeObserver) new ResizeObserver(fitLobbyTiles).observe(lobbyTilesEl);
+  window.addEventListener('resize', fitLobbyTiles);
+  function lobbyCount() { $('lobby-count').textContent = lTiles.size ? '· ' + lTiles.size + (lTiles.size === 1 ? ' pessoa' : ' pessoas') : ''; fitLobbyTiles(); }
   function lobbyTile(id, name) {
     var t = lTiles.get(id);
     if (t) return t;
@@ -908,10 +930,12 @@
     var lp = lobby && lobby.room.localParticipant;
     var micOn = !!lp && lp.isMicrophoneEnabled;
     var camOn = !!lp && lp.isCameraEnabled;
-    mic.innerHTML = (micOn ? A.ICON.mic : A.ICON.micoff) + (micOn ? 'Microfone ligado' : 'Ligar microfone');
+    mic.innerHTML = (micOn ? A.ICON.mic : A.ICON.micoff) + 'Microfone' + sw(micOn);
+    mic.setAttribute('aria-label', micOn ? 'Microfone ligado. Toque para desligar' : 'Microfone desligado. Toque para ligar');
+    cam.setAttribute('aria-label', camOn ? 'Câmera ligada. Toque para desligar' : 'Câmera desligada. Toque para ligar');
     mic.className = 'btn' + (micOn ? ' btn-live' : '');
     mic.setAttribute('aria-pressed', String(micOn));
-    cam.innerHTML = A.ICON.cam + (camOn ? 'Câmera ligada' : 'Ligar câmera');
+    cam.innerHTML = A.ICON.cam + 'Câmera' + sw(camOn);
     cam.className = 'btn' + (camOn ? ' btn-live' : '');
     cam.setAttribute('aria-pressed', String(camOn));
     mic.disabled = cam.disabled = !lobby;
@@ -1058,6 +1082,13 @@
   }
   lchatRender(false);
   lobbyControls();
+  $('lb-chat-toggle').addEventListener('click', function () {
+    var box = $('lb-chat'), hide = !box.classList.contains('collapsed');
+    box.classList.toggle('collapsed', hide);
+    this.textContent = hide ? 'Mostrar' : 'Esconder';
+    this.setAttribute('aria-expanded', String(!hide));
+    if (!hide) lchatEl.scrollTop = lchatEl.scrollHeight;
+  });
   $('lb-chat-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var inp = $('lb-chat-in');
@@ -1205,7 +1236,9 @@
   trPaint();
 
   // ---------- dinâmicas da sala ----------
-  var dyn = { key: null, data: null, trv: -1, fetched: 0, tick: 0 };
+  var dyn = { key: null, data: null, trv: -1, trq: -1, fetched: 0, tick: 0 };
+  var actSub = 'din';
+  var qEl = $('q-body');
   var dynEl = $('dyn-body');
   var dynBusy = false;
   function dynSet(d) {
@@ -1218,7 +1251,7 @@
   }
   function syncDyn() {
     var key = snap && snap.room ? snap.round + ':' + snap.room.id : null;
-    if (key !== dyn.key) { dyn = { key: key, data: null, trv: -1, fetched: 0, tick: dyn.tick }; dynPaint(); }
+    if (key !== dyn.key) { dyn = { key: key, data: null, trv: -1, trq: -1, fetched: 0, tick: dyn.tick }; dynPaint(); }
     if (!key || !session) return;
     if (Date.now() - dyn.fetched < 15000) return;
     dyn.fetched = Date.now();
@@ -1236,7 +1269,32 @@
     });
   }
   function ptLine(x, show) { return show && x && x.pt ? '<p class="pt">' + A.esc(x.pt) + '</p>' : ''; }
+  function qPaint() {
+    var d = dyn.data;
+    if (!snap || !snap.room) { qEl.innerHTML = '<p class="none">As perguntas aparecem quando você estiver em uma sala.</p>'; return; }
+    if (!d || !d.pergunta) { qEl.innerHTML = '<p class="none">' + (d ? 'Nenhuma pergunta disponível.' : 'Carregando…') + '</p>'; return; }
+    var show = dyn.trq === d.pn;
+    qEl.innerHTML = '<div class="box"><span class="lbl">Pergunta para a sala</span><span class="big" style="font-size:26px">' + A.esc(d.pergunta.en) + '</span>' + ptLine(d.pergunta, show) + '</div>' +
+      '<p class="small">Cada pessoa responde em inglês, uma de cada vez.</p>' +
+      (show ? '' : '<button class="btn btn-sm" data-dyn="qtrans" type="button">Ver tradução</button>') +
+      '<button class="btn btn-primary" data-dyn="qnext" type="button">Sortear outra pergunta</button>';
+  }
+  function subPaint() {
+    document.querySelectorAll('#pane-dyn .sub').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-sub') === actSub); });
+    dynEl.hidden = actSub !== 'din';
+    qEl.hidden = actSub !== 'per';
+  }
+  document.querySelectorAll('#pane-dyn .sub').forEach(function (b) {
+    b.addEventListener('click', function () { actSub = b.getAttribute('data-sub'); subPaint(); });
+  });
+  qEl.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-dyn]') : null;
+    if (!b) return;
+    if (b.getAttribute('data-dyn') === 'qtrans') { dyn.trq = dyn.data.pn; qPaint(); return; }
+    dynAct('qnext');
+  });
   function dynPaint() {
+    qPaint();
     var d = dyn.data;
     if (!snap || !snap.room) { dynEl.innerHTML = '<p class="none">As dinâmicas aparecem quando você estiver em uma sala.</p>'; return; }
     if (!d || d.empty) { dynEl.innerHTML = '<p class="none">' + (d ? 'Nenhuma dinâmica disponível.' : 'Carregando…') + '</p>'; return; }

@@ -54,3 +54,15 @@ test('sortear outra muda o jogo e volta para a explicação; só iniciantes não
   assert.equal(D.view(c, room, 'p0', 2).item, undefined);
   for (let i = 0; i < 30; i++) { st.gameId = 'quemsou'; st.started = false; D.act(c, room, 'start', 1); D.view(c, room, 'p0', 1).outros.forEach(function (o) { assert.ok(o.id.en !== 'Albert Einstein' && o.id.en !== 'Barack Obama'); }); }
 });
+test('perguntas: a mesma para toda a sala, sem sim/não, e sortear outra troca', function () {
+  const { c, room } = mk(['basico', 'basico']);
+  const a = D.view(c, room, 'p0', 1); const b = D.view(c, room, 'p1', 1);
+  assert.ok(a.pergunta && a.pergunta.en && a.pergunta.pt);
+  assert.equal(a.pergunta.en, b.pergunta.en);
+  assert.ok(!/^(do|does|did|is|are|can|could|will|would|have|has) /i.test(a.pergunta.en) || /^(would)/i.test(a.pergunta.en) === false);
+  D.act(c, room, 'qnext', 2);
+  assert.notEqual(D.view(c, room, 'p0', 3).pergunta.en, a.pergunta.en);
+  const all = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '../lib/perguntas.json'), 'utf8')).perguntas;
+  assert.ok(all.length >= 200);
+  all.forEach(function (q) { assert.ok(!/^(do|does|did|is|are|can|could|will|have|has|was|were) /i.test(q.en), q.en); });
+});

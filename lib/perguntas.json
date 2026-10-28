@@ -1,0 +1,917 @@
+{
+ "_leia-me": "Perguntas da aba Atividades > Perguntas (nenhuma é de sim ou não). Adicione {\"en\":..., \"pt\":...}. \"niveis\" é opcional. Reinicie o servidor.",
+ "perguntas": [
+  {
+   "en": "What is your name and where are you from?",
+   "pt": "Qual é o seu nome e de onde você é?"
+  },
+  {
+   "en": "How was your day today?",
+   "pt": "Como foi o seu dia hoje?"
+  },
+  {
+   "en": "What did you do yesterday?",
+   "pt": "O que você fez ontem?"
+  },
+  {
+   "en": "What are you going to do this weekend?",
+   "pt": "O que você vai fazer neste fim de semana?"
+  },
+  {
+   "en": "What time do you wake up on weekdays?",
+   "pt": "A que horas você acorda durante a semana?"
+  },
+  {
+   "en": "What do you usually have for breakfast?",
+   "pt": "O que você costuma comer no café da manhã?"
+  },
+  {
+   "en": "What do you usually have for dinner?",
+   "pt": "O que você costuma comer no jantar?"
+  },
+  {
+   "en": "How do you go to work or school?",
+   "pt": "Como você vai para o trabalho ou para a escola?"
+  },
+  {
+   "en": "Where do you live? Describe your neighborhood.",
+   "pt": "Onde você mora? Descreva o seu bairro."
+  },
+  {
+   "en": "Who lives with you?",
+   "pt": "Quem mora com você?"
+  },
+  {
+   "en": "How many people are in your family?",
+   "pt": "Quantas pessoas há na sua família?"
+  },
+  {
+   "en": "Tell me about your best friend.",
+   "pt": "Fale sobre o seu melhor amigo."
+  },
+  {
+   "en": "What does your mother do?",
+   "pt": "O que a sua mãe faz?"
+  },
+  {
+   "en": "What does your father do?",
+   "pt": "O que o seu pai faz?"
+  },
+  {
+   "en": "Tell me about your brothers or sisters.",
+   "pt": "Fale sobre os seus irmãos."
+  },
+  {
+   "en": "What is your job? What do you do every day?",
+   "pt": "Qual é o seu trabalho? O que você faz todos os dias?"
+  },
+  {
+   "en": "What do you like about your job?",
+   "pt": "O que você gosta no seu trabalho?"
+  },
+  {
+   "en": "What is your dream job?",
+   "pt": "Qual é o trabalho dos seus sonhos?"
+  },
+  {
+   "en": "What did you want to be when you were a child?",
+   "pt": "O que você queria ser quando era criança?"
+  },
+  {
+   "en": "What was your favorite game when you were a child?",
+   "pt": "Qual era a sua brincadeira favorita quando você era criança?"
+  },
+  {
+   "en": "Where did you grow up?",
+   "pt": "Onde você cresceu?"
+  },
+  {
+   "en": "What is your earliest memory?",
+   "pt": "Qual é a sua lembrança mais antiga?"
+  },
+  {
+   "en": "What is the best gift you ever received?",
+   "pt": "Qual foi o melhor presente que você já recebeu?"
+  },
+  {
+   "en": "What is the best trip you ever took?",
+   "pt": "Qual foi a melhor viagem que você já fez?"
+  },
+  {
+   "en": "Where do you want to travel next? Why?",
+   "pt": "Para onde você quer viajar em seguida? Por quê?"
+  },
+  {
+   "en": "What country do you want to visit? Why?",
+   "pt": "Qual país você quer visitar? Por quê?"
+  },
+  {
+   "en": "What things do you always take when you travel?",
+   "pt": "Que coisas você sempre leva quando viaja?"
+  },
+  {
+   "en": "Which do you prefer, the beach or the mountains? Why?",
+   "pt": "O que você prefere, a praia ou a montanha? Por quê?"
+  },
+  {
+   "en": "What do you do to relax?",
+   "pt": "O que você faz para relaxar?"
+  },
+  {
+   "en": "What do you do when you are bored?",
+   "pt": "O que você faz quando está entediado?"
+  },
+  {
+   "en": "What do you do on your birthday?",
+   "pt": "O que você faz no seu aniversário?"
+  },
+  {
+   "en": "How do you celebrate Christmas or New Year?",
+   "pt": "Como você comemora o Natal ou o Ano Novo?"
+  },
+  {
+   "en": "What is the weather like today?",
+   "pt": "Como está o tempo hoje?"
+  },
+  {
+   "en": "What is your favorite kind of weather?",
+   "pt": "Qual é o seu tipo de clima favorito?"
+  },
+  {
+   "en": "What do you wear when it is cold?",
+   "pt": "O que você veste quando está frio?"
+  },
+  {
+   "en": "What do you wear when it is hot?",
+   "pt": "O que você veste quando está calor?"
+  },
+  {
+   "en": "What clothes do you wear to work or school?",
+   "pt": "Que roupas você usa para ir ao trabalho ou à escola?"
+  },
+  {
+   "en": "Where do you usually buy clothes?",
+   "pt": "Onde você costuma comprar roupas?"
+  },
+  {
+   "en": "What do you do on a typical Saturday?",
+   "pt": "O que você faz em um sábado típico?"
+  },
+  {
+   "en": "What do you do on Sundays?",
+   "pt": "O que você faz aos domingos?"
+  },
+  {
+   "en": "What is your morning routine?",
+   "pt": "Qual é a sua rotina da manhã?"
+  },
+  {
+   "en": "What is your night routine?",
+   "pt": "Qual é a sua rotina da noite?"
+  },
+  {
+   "en": "How do you spend your lunch break?",
+   "pt": "Como você passa o seu horário de almoço?"
+  },
+  {
+   "en": "How do you cook your favorite dish?",
+   "pt": "Como você prepara o seu prato favorito?"
+  },
+  {
+   "en": "What is a typical Brazilian dish? Describe it.",
+   "pt": "Qual é um prato típico brasileiro? Descreva-o."
+  },
+  {
+   "en": "What food do you not like? Why?",
+   "pt": "Que comida você não gosta? Por quê?"
+  },
+  {
+   "en": "What is the best restaurant in your city?",
+   "pt": "Qual é o melhor restaurante da sua cidade?"
+  },
+  {
+   "en": "What do you usually order at a restaurant?",
+   "pt": "O que você costuma pedir em um restaurante?"
+  },
+  {
+   "en": "How often do you eat out?",
+   "pt": "Com que frequência você come fora?"
+  },
+  {
+   "en": "What do you eat when you are in a hurry?",
+   "pt": "O que você come quando está com pressa?"
+  },
+  {
+   "en": "What do you drink during the day?",
+   "pt": "O que você bebe durante o dia?"
+  },
+  {
+   "en": "How do you like your coffee?",
+   "pt": "Como você gosta do seu café?"
+  },
+  {
+   "en": "What snacks do you like?",
+   "pt": "Que lanchinhos você gosta?"
+  },
+  {
+   "en": "What is in your fridge right now?",
+   "pt": "O que tem na sua geladeira agora?"
+  },
+  {
+   "en": "What is in your bag right now?",
+   "pt": "O que tem na sua bolsa ou mochila agora?"
+  },
+  {
+   "en": "What apps do you use every day?",
+   "pt": "Que aplicativos você usa todos os dias?"
+  },
+  {
+   "en": "How much time do you spend on your phone?",
+   "pt": "Quanto tempo você passa no celular?"
+  },
+  {
+   "en": "What do you usually do on the internet?",
+   "pt": "O que você costuma fazer na internet?"
+  },
+  {
+   "en": "What kind of music do you listen to?",
+   "pt": "Que tipo de música você ouve?"
+  },
+  {
+   "en": "Who is your favorite singer or band?",
+   "pt": "Quem é o seu cantor ou banda favorita?"
+  },
+  {
+   "en": "What was the last concert you went to?",
+   "pt": "Qual foi o último show a que você foi?"
+  },
+  {
+   "en": "Which musical instrument can you play, or would you like to play?",
+   "pt": "Que instrumento musical você sabe tocar, ou gostaria de tocar?"
+  },
+  {
+   "en": "What is the last movie you watched? What was it about?",
+   "pt": "Qual foi o último filme que você assistiu? Sobre o que era?"
+  },
+  {
+   "en": "What kind of movies do you like?",
+   "pt": "De que tipo de filme você gosta?"
+  },
+  {
+   "en": "Who is your favorite actor or actress?",
+   "pt": "Quem é o seu ator ou atriz favorito?"
+  },
+  {
+   "en": "What TV series do you like? Why?",
+   "pt": "Que séries de TV você gosta? Por quê?"
+  },
+  {
+   "en": "What was the last book you read?",
+   "pt": "Qual foi o último livro que você leu?"
+  },
+  {
+   "en": "What do you do when you have free time?",
+   "pt": "O que você faz quando tem tempo livre?"
+  },
+  {
+   "en": "What hobbies do you have?",
+   "pt": "Que hobbies você tem?"
+  },
+  {
+   "en": "What new hobby do you want to try?",
+   "pt": "Que novo hobby você quer experimentar?"
+  },
+  {
+   "en": "What sport do you play or watch?",
+   "pt": "Que esporte você pratica ou assiste?"
+  },
+  {
+   "en": "Who is your favorite athlete? Why?",
+   "pt": "Quem é o seu atleta favorito? Por quê?"
+  },
+  {
+   "en": "How do you stay healthy?",
+   "pt": "Como você se mantém saudável?"
+  },
+  {
+   "en": "How often do you exercise? What do you do?",
+   "pt": "Com que frequência você se exercita? O que você faz?"
+  },
+  {
+   "en": "How many hours do you sleep every night?",
+   "pt": "Quantas horas você dorme por noite?"
+  },
+  {
+   "en": "What do you do when you cannot sleep?",
+   "pt": "O que você faz quando não consegue dormir?"
+  },
+  {
+   "en": "What do you do when you feel stressed?",
+   "pt": "O que você faz quando se sente estressado?"
+  },
+  {
+   "en": "What makes you happy?",
+   "pt": "O que deixa você feliz?"
+  },
+  {
+   "en": "What makes you angry?",
+   "pt": "O que deixa você com raiva?"
+  },
+  {
+   "en": "What makes you laugh?",
+   "pt": "O que faz você rir?"
+  },
+  {
+   "en": "What are you afraid of?",
+   "pt": "Do que você tem medo?"
+  },
+  {
+   "en": "What is the most beautiful place you have ever seen?",
+   "pt": "Qual é o lugar mais bonito que você já viu?"
+  },
+  {
+   "en": "What is the best thing about your city?",
+   "pt": "Qual é a melhor coisa da sua cidade?"
+  },
+  {
+   "en": "What is the worst thing about your city?",
+   "pt": "Qual é a pior coisa da sua cidade?"
+  },
+  {
+   "en": "How is the traffic in your city?",
+   "pt": "Como é o trânsito na sua cidade?"
+  },
+  {
+   "en": "How is public transportation in your city?",
+   "pt": "Como é o transporte público na sua cidade?"
+  },
+  {
+   "en": "Where do you go to have fun in your city?",
+   "pt": "Aonde você vai para se divertir na sua cidade?"
+  },
+  {
+   "en": "What would you show a tourist in your city?",
+   "pt": "O que você mostraria a um turista na sua cidade?"
+  },
+  {
+   "en": "Describe your house or apartment.",
+   "pt": "Descreva a sua casa ou apartamento."
+  },
+  {
+   "en": "What is your favorite room at home? Why?",
+   "pt": "Qual é o seu cômodo favorito em casa? Por quê?"
+  },
+  {
+   "en": "What chores do you do at home?",
+   "pt": "Que tarefas domésticas você faz em casa?"
+  },
+  {
+   "en": "What chores do you hate?",
+   "pt": "Que tarefas domésticas você odeia?"
+  },
+  {
+   "en": "Who cooks at your house?",
+   "pt": "Quem cozinha na sua casa?"
+  },
+  {
+   "en": "Tell me about your pets, or the pet you would like to have.",
+   "pt": "Fale sobre os seus animais de estimação, ou o que você gostaria de ter."
+  },
+  {
+   "en": "What was your favorite subject at school?",
+   "pt": "Qual era a sua matéria favorita na escola?"
+  },
+  {
+   "en": "What subject was difficult for you at school?",
+   "pt": "Que matéria era difícil para você na escola?"
+  },
+  {
+   "en": "Tell me about your best teacher.",
+   "pt": "Fale sobre o seu melhor professor."
+  },
+  {
+   "en": "Why are you learning English?",
+   "pt": "Por que você está aprendendo inglês?"
+  },
+  {
+   "en": "What is difficult about learning English?",
+   "pt": "O que é difícil em aprender inglês?"
+  },
+  {
+   "en": "What English words do you love?",
+   "pt": "Que palavras em inglês você adora?"
+  },
+  {
+   "en": "How do you practice English every day?",
+   "pt": "Como você pratica inglês todos os dias?"
+  },
+  {
+   "en": "When do you need English in your life?",
+   "pt": "Quando você precisa de inglês na sua vida?"
+  },
+  {
+   "en": "What do you want to do with English in the future?",
+   "pt": "O que você quer fazer com o inglês no futuro?"
+  },
+  {
+   "en": "What are your goals for this year?",
+   "pt": "Quais são os seus objetivos para este ano?"
+  },
+  {
+   "en": "What are your plans for next year?",
+   "pt": "Quais são os seus planos para o ano que vem?"
+  },
+  {
+   "en": "What do you want to learn?",
+   "pt": "O que você quer aprender?"
+  },
+  {
+   "en": "What are you good at?",
+   "pt": "No que você é bom?"
+  },
+  {
+   "en": "What are you bad at?",
+   "pt": "No que você é ruim?"
+  },
+  {
+   "en": "What did you do for the first time recently?",
+   "pt": "O que você fez pela primeira vez recentemente?"
+  },
+  {
+   "en": "What is the most difficult thing you ever did?",
+   "pt": "Qual foi a coisa mais difícil que você já fez?"
+  },
+  {
+   "en": "What is the funniest thing that happened to you?",
+   "pt": "Qual foi a coisa mais engraçada que aconteceu com você?"
+  },
+  {
+   "en": "What is the most embarrassing thing that happened to you?",
+   "pt": "Qual foi a coisa mais vergonhosa que aconteceu com você?"
+  },
+  {
+   "en": "Tell me about a good day in your life.",
+   "pt": "Conte sobre um dia bom na sua vida."
+  },
+  {
+   "en": "Tell me about a bad day in your life.",
+   "pt": "Conte sobre um dia ruim na sua vida."
+  },
+  {
+   "en": "What was the best day of your life?",
+   "pt": "Qual foi o melhor dia da sua vida?"
+  },
+  {
+   "en": "What did you do last weekend?",
+   "pt": "O que você fez no último fim de semana?"
+  },
+  {
+   "en": "What did you do last summer?",
+   "pt": "O que você fez no último verão?"
+  },
+  {
+   "en": "What did you eat today?",
+   "pt": "O que você comeu hoje?"
+  },
+  {
+   "en": "Who did you talk to today?",
+   "pt": "Com quem você conversou hoje?"
+  },
+  {
+   "en": "What did you learn this week?",
+   "pt": "O que você aprendeu esta semana?"
+  },
+  {
+   "en": "What are you doing right now?",
+   "pt": "O que você está fazendo agora?"
+  },
+  {
+   "en": "What are you wearing today?",
+   "pt": "O que você está vestindo hoje?"
+  },
+  {
+   "en": "Where is your favorite place to shop?",
+   "pt": "Qual é o seu lugar favorito para fazer compras?"
+  },
+  {
+   "en": "What do you buy every week?",
+   "pt": "O que você compra toda semana?"
+  },
+  {
+   "en": "What was the last thing you bought?",
+   "pt": "Qual foi a última coisa que você comprou?"
+  },
+  {
+   "en": "What do you want to buy next?",
+   "pt": "O que você quer comprar em seguida?"
+  },
+  {
+   "en": "How do you save money?",
+   "pt": "Como você economiza dinheiro?"
+  },
+  {
+   "en": "What can you not live without?",
+   "pt": "Sem o que você não consegue viver?"
+  },
+  {
+   "en": "What is your favorite thing that you own?",
+   "pt": "Qual é a sua coisa favorita que você possui?"
+  },
+  {
+   "en": "Who do you call most often?",
+   "pt": "Para quem você mais liga?"
+  },
+  {
+   "en": "Who is the funniest person you know?",
+   "pt": "Quem é a pessoa mais engraçada que você conhece?"
+  },
+  {
+   "en": "Who is the kindest person you know?",
+   "pt": "Quem é a pessoa mais gentil que você conhece?"
+  },
+  {
+   "en": "Who is the most important person in your life? Why?",
+   "pt": "Quem é a pessoa mais importante da sua vida? Por quê?"
+  },
+  {
+   "en": "Who do you admire? Why?",
+   "pt": "Quem você admira? Por quê?"
+  },
+  {
+   "en": "Which famous person would you like to meet? Why?",
+   "pt": "Qual pessoa famosa você gostaria de conhecer? Por quê?"
+  },
+  {
+   "en": "What is your favorite memory with your family?",
+   "pt": "Qual é a sua lembrança favorita com a sua família?"
+  },
+  {
+   "en": "How do you spend time with your friends?",
+   "pt": "Como você passa o tempo com os seus amigos?"
+  },
+  {
+   "en": "How do you make new friends?",
+   "pt": "Como você faz novos amigos?"
+  },
+  {
+   "en": "What makes a good friend?",
+   "pt": "O que faz um bom amigo?"
+  },
+  {
+   "en": "What makes a good teacher?",
+   "pt": "O que faz um bom professor?"
+  },
+  {
+   "en": "What makes a good boss?",
+   "pt": "O que faz um bom chefe?"
+  },
+  {
+   "en": "How do you help other people?",
+   "pt": "Como você ajuda outras pessoas?"
+  },
+  {
+   "en": "What is the best advice you ever received?",
+   "pt": "Qual foi o melhor conselho que você já recebeu?"
+  },
+  {
+   "en": "What advice would you give to a young person?",
+   "pt": "Que conselho você daria a um jovem?"
+  },
+  {
+   "en": "What do you miss from your childhood?",
+   "pt": "Do que você sente falta da sua infância?"
+  },
+  {
+   "en": "What is different in your life now compared to five years ago?",
+   "pt": "O que é diferente na sua vida agora em comparação a cinco anos atrás?"
+  },
+  {
+   "en": "Where do you see yourself in five years?",
+   "pt": "Onde você se vê daqui a cinco anos?"
+  },
+  {
+   "en": "What is your biggest dream?",
+   "pt": "Qual é o seu maior sonho?"
+  },
+  {
+   "en": "What would you like to change in your life?",
+   "pt": "O que você gostaria de mudar na sua vida?"
+  },
+  {
+   "en": "What would you like to change in your city?",
+   "pt": "O que você gostaria de mudar na sua cidade?"
+  },
+  {
+   "en": "How do you get information about the news?",
+   "pt": "Como você se informa sobre as notícias?"
+  },
+  {
+   "en": "What is a tradition in your family?",
+   "pt": "Qual é uma tradição da sua família?"
+  },
+  {
+   "en": "What is a tradition in your country?",
+   "pt": "Qual é uma tradição do seu país?"
+  },
+  {
+   "en": "What is typical in your region?",
+   "pt": "O que é típico da sua região?"
+  },
+  {
+   "en": "What do you do at a party?",
+   "pt": "O que você faz em uma festa?"
+  },
+  {
+   "en": "What kind of party do you like?",
+   "pt": "De que tipo de festa você gosta?"
+  },
+  {
+   "en": "What is your favorite way to travel? Why?",
+   "pt": "Qual é a sua forma favorita de viajar? Por quê?"
+  },
+  {
+   "en": "What do you see on your way to work or school?",
+   "pt": "O que você vê no caminho para o trabalho ou para a escola?"
+  },
+  {
+   "en": "Describe your perfect day.",
+   "pt": "Descreva o seu dia perfeito."
+  },
+  {
+   "en": "Describe your perfect weekend.",
+   "pt": "Descreva o seu fim de semana perfeito."
+  },
+  {
+   "en": "Describe your dream house.",
+   "pt": "Descreva a casa dos seus sonhos."
+  },
+  {
+   "en": "Describe your favorite photograph.",
+   "pt": "Descreva a sua fotografia favorita."
+  },
+  {
+   "en": "Describe your favorite place in the world.",
+   "pt": "Descreva o seu lugar favorito no mundo."
+  },
+  {
+   "en": "How do you feel today? Why?",
+   "pt": "Como você se sente hoje? Por quê?"
+  },
+  {
+   "en": "What is the first thing you do in the morning?",
+   "pt": "Qual é a primeira coisa que você faz de manhã?"
+  },
+  {
+   "en": "What is the last thing you do before bed?",
+   "pt": "Qual é a última coisa que você faz antes de dormir?"
+  },
+  {
+   "en": "What is your favorite food? Why?",
+   "pt": "Qual é a sua comida favorita? Por quê?"
+  },
+  {
+   "en": "What is your favorite movie? Why?",
+   "pt": "Qual é o seu filme favorito? Por quê?"
+  },
+  {
+   "en": "What is your favorite song? Why?",
+   "pt": "Qual é a sua música favorita? Por quê?"
+  },
+  {
+   "en": "What is your favorite color? Why?",
+   "pt": "Qual é a sua cor favorita? Por quê?"
+  },
+  {
+   "en": "What is your favorite animal? Why?",
+   "pt": "Qual é o seu animal favorito? Por quê?"
+  },
+  {
+   "en": "What is your favorite season of the year? Why?",
+   "pt": "Qual é a sua estação do ano favorita? Por quê?"
+  },
+  {
+   "en": "What is your favorite holiday? Why?",
+   "pt": "Qual é o seu feriado favorito? Por quê?"
+  },
+  {
+   "en": "What is your favorite sport? Why?",
+   "pt": "Qual é o seu esporte favorito? Por quê?"
+  },
+  {
+   "en": "What is your favorite book? Why?",
+   "pt": "Qual é o seu livro favorito? Por quê?"
+  },
+  {
+   "en": "What is your favorite fruit? Why?",
+   "pt": "Qual é a sua fruta favorita? Por quê?"
+  },
+  {
+   "en": "What is your favorite drink? Why?",
+   "pt": "Qual é a sua bebida favorita? Por quê?"
+  },
+  {
+   "en": "What is your favorite TV show? Why?",
+   "pt": "Qual é a sua série de TV favorita? Por quê?"
+  },
+  {
+   "en": "What is your favorite day of the week? Why?",
+   "pt": "Qual é o seu dia da semana favorito? Por quê?"
+  },
+  {
+   "en": "What is your favorite place to relax? Why?",
+   "pt": "Qual é o seu lugar para relaxar favorito? Por quê?"
+  },
+  {
+   "en": "What is your favorite city in the world? Why?",
+   "pt": "Qual é a sua cidade do mundo favorita? Por quê?"
+  },
+  {
+   "en": "What is your favorite subject to study? Why?",
+   "pt": "Qual é o seu assunto para estudar favorito? Por quê?"
+  },
+  {
+   "en": "What do you usually do on weekends?",
+   "pt": "O que você costuma fazer nos fins de semana?"
+  },
+  {
+   "en": "What do you usually do on holidays?",
+   "pt": "O que você costuma fazer nos feriados?"
+  },
+  {
+   "en": "What do you usually do on vacation?",
+   "pt": "O que você costuma fazer nas férias?"
+  },
+  {
+   "en": "What do you usually do on rainy days?",
+   "pt": "O que você costuma fazer em dias de chuva?"
+  },
+  {
+   "en": "What do you usually do on Saturday nights?",
+   "pt": "O que você costuma fazer nos sábados à noite?"
+  },
+  {
+   "en": "What do you usually do on Monday mornings?",
+   "pt": "O que você costuma fazer nas manhãs de segunda-feira?"
+  },
+  {
+   "en": "What do you usually do after work or school?",
+   "pt": "O que você costuma fazer depois do trabalho ou da escola?"
+  },
+  {
+   "en": "What do you usually do in the summer?",
+   "pt": "O que você costuma fazer no verão?"
+  },
+  {
+   "en": "What do you usually do in the winter?",
+   "pt": "O que você costuma fazer no inverno?"
+  },
+  {
+   "en": "What do you usually do before a trip?",
+   "pt": "O que você costuma fazer antes de uma viagem?"
+  },
+  {
+   "en": "Tell me about your family.",
+   "pt": "Fale sobre sua família."
+  },
+  {
+   "en": "Tell me about your neighborhood.",
+   "pt": "Fale sobre seu bairro."
+  },
+  {
+   "en": "Tell me about your city.",
+   "pt": "Fale sobre sua cidade."
+  },
+  {
+   "en": "Tell me about your school or workplace.",
+   "pt": "Fale sobre sua escola ou local de trabalho."
+  },
+  {
+   "en": "Tell me about your favorite teacher.",
+   "pt": "Fale sobre seu professor favorito."
+  },
+  {
+   "en": "Tell me about your favorite relative.",
+   "pt": "Fale sobre seu parente favorito."
+  },
+  {
+   "en": "Tell me about your first job.",
+   "pt": "Fale sobre seu primeiro emprego."
+  },
+  {
+   "en": "Tell me about your last vacation.",
+   "pt": "Fale sobre suas últimas férias."
+  },
+  {
+   "en": "Tell me about your last birthday.",
+   "pt": "Fale sobre seu último aniversário."
+  },
+  {
+   "en": "What do you like about your city?",
+   "pt": "O que você gosta da sua cidade?"
+  },
+  {
+   "en": "What do you like about your house?",
+   "pt": "O que você gosta da sua casa?"
+  },
+  {
+   "en": "What do you like about your school?",
+   "pt": "O que você gosta da sua escola?"
+  },
+  {
+   "en": "What do you like about your country?",
+   "pt": "O que você gosta do seu país?"
+  },
+  {
+   "en": "What do you like about your neighborhood?",
+   "pt": "O que você gosta do seu bairro?"
+  },
+  {
+   "en": "What do you like about your family?",
+   "pt": "O que você gosta da sua família?"
+  },
+  {
+   "en": "What do you like about summer?",
+   "pt": "O que você gosta do verão?"
+  },
+  {
+   "en": "What do you like about winter?",
+   "pt": "O que você gosta do inverno?"
+  },
+  {
+   "en": "What do you like about weekends?",
+   "pt": "O que você gosta dos fins de semana?"
+  },
+  {
+   "en": "What do you like about Brazil?",
+   "pt": "O que você gosta do Brasil?"
+  },
+  {
+   "en": "What do you like about learning English?",
+   "pt": "O que você gosta de aprender inglês?"
+  },
+  {
+   "en": "How do you feel when it rains?",
+   "pt": "Como você se sente quando chove?"
+  },
+  {
+   "en": "How do you feel when you wake up early?",
+   "pt": "Como você se sente quando você acorda cedo?"
+  },
+  {
+   "en": "How do you feel when you are with your friends?",
+   "pt": "Como você se sente quando você está com seus amigos?"
+  },
+  {
+   "en": "How do you feel when you speak English?",
+   "pt": "Como você se sente quando você fala inglês?"
+  },
+  {
+   "en": "How do you feel when you are alone at home?",
+   "pt": "Como você se sente quando você está sozinho em casa?"
+  },
+  {
+   "en": "How do you feel when you eat your favorite food?",
+   "pt": "Como você se sente quando você come a sua comida favorita?"
+  },
+  {
+   "en": "How do you feel when you are stuck in traffic?",
+   "pt": "Como você se sente quando você está preso no trânsito?"
+  },
+  {
+   "en": "How do you feel when you listen to music?",
+   "pt": "Como você se sente quando você escuta música?"
+  },
+  {
+   "en": "How do you feel when it is Monday?",
+   "pt": "Como você se sente quando é segunda-feira?"
+  },
+  {
+   "en": "How do you feel when you travel?",
+   "pt": "Como você se sente quando você viaja?"
+  },
+  {
+   "en": "What would you do if you won a lot of money?",
+   "pt": "O que você faria se ganhasse muito dinheiro?"
+  },
+  {
+   "en": "What would you do if you could fly?",
+   "pt": "O que você faria se pudesse voar?"
+  },
+  {
+   "en": "What would you do if you lost your phone?",
+   "pt": "O que você faria se perdesse o seu celular?"
+  },
+  {
+   "en": "What would you do if you met a famous person?",
+   "pt": "O que você faria se conhecesse uma pessoa famosa?"
+  },
+  {
+   "en": "What would you do if you had a free day?",
+   "pt": "O que você faria se tivesse um dia livre?"
+  },
+  {
+   "en": "What would you do if you could travel anywhere?",
+   "pt": "O que você faria se pudesse viajar para qualquer lugar?"
+  }
+ ]
+}
