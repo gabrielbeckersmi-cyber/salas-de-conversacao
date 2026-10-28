@@ -812,10 +812,7 @@
     $('l-room').textContent = 'Sala ' + r.no;
     $('l-round').textContent = 'Rodada ' + snap.round + ' de 2';
     var b = $('l-banner');
-    if (r.hear === 'talk') {
-      b.hidden = false; b.className = 'banner talk';
-      b.innerHTML = '<span class="pulse"></span>O professor está falando com a sala.';
-    } else if (r.hear === 'listen') {
+    if (r.hear === 'listen') {
       b.hidden = false; b.className = 'banner listen';
       b.innerHTML = '<span class="eq"><i></i><i></i><i></i></span>O professor está ouvindo a sala.';
     } else {

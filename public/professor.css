@@ -220,3 +220,6 @@
 .bc-card-b .btn:only-child { grid-column: 1 / -1; }
 .bc-form { display: flex; flex-wrap: wrap; gap: 8px; }
 .bc-form .input { flex: 1 1 260px; min-width: 0; }
+.bcast summary { padding: 10px 16px; }
+.bcast[open] > summary { border-bottom: 1px solid var(--line); }
+.bc-title { padding: 8px 16px; }

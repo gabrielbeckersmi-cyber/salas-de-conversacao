@@ -778,8 +778,6 @@
     h += '<button class="btn" data-act="add-room" type="button">+ Sala vazia</button></div>';
     if (planning && S.phase === 'between' && S.repeats) {
       h += '<p class="hint">' + S.repeats + ' par' + (S.repeats > 1 ? 'es' : '') + ' repetido' + (S.repeats > 1 ? 's' : '') + ' da rodada 1 (há poucos alunos em um dos níveis).</p>';
-    } else if (live) {
-      h += '<p class="hint">Use “Entrar na sala” para ver, ouvir e falar com uma sala. Use fones de ouvido para evitar eco.</p>';
     }
 
     var duo = '';
@@ -789,8 +787,8 @@
         (unassigned.length ? unassigned.map(function (s) { return chipHTML(s, null); }).join('') : '<span class="empty">Todos os alunos estão em salas. Arraste um aluno para cá para tirá-lo de uma sala.</span>') + '</div></section>';
     }
     if (duo) h += '<div class="duo">' + duo + '</div>';
-    if (live) h += '<div id="bc-slot"></div>';
     h += '<div class="board">' + S.rooms.map(function (r) { return roomHTML(r, by); }).join('') + '</div>';
+    if (live) h += '<div id="bc-slot"></div>';
     h += '<div id="set-slot"></div><div id="em-slot"></div>';
 
     app.innerHTML = h;
@@ -895,9 +893,10 @@
   var bcEl = null;
   function ensureBc() {
     if (bcEl) return;
-    bcEl = document.createElement('section');
-    bcEl.className = 'bcast';
-    bcEl.innerHTML = '<div id="bc-top"></div>' +
+    bcEl = document.createElement('details');
+    bcEl.className = 'bcast em';
+    bcEl.open = true;
+    bcEl.innerHTML = '<summary>Transmissão do professor</summary><div id="bc-top"></div>' +
       '<form id="bc-form" class="bc-step" autocomplete="off"><div class="bc-step-h"><span class="num">3</span><b>Envie uma mensagem</b><span class="small">aparece no chat dos alunos</span></div>' +
       '<div class="bc-form"><input class="input" id="bc-text" maxlength="300" placeholder="Mensagem do professor para as salas…" aria-label="Mensagem do professor">' +
       '<button class="btn btn-primary" type="submit" data-send="sel" id="bc-send-sel">Enviar às selecionadas</button>' +
@@ -917,7 +916,7 @@
     var mic = (S.bmic || []).length;
     var sh = ui.share ? ui.share.rooms.size : 0;
     var cm = ui.camRooms.size;
-    var h = '<div class="bc-title"><b>Transmissão do professor</b><span class="small">Enviar para várias salas ao mesmo tempo. Microfone, tela e câmera usam minutos do LiveKit enquanto estiverem ligados.</span></div>' +
+    var h = '<div class="bc-title"><span class="small">Enviar para várias salas ao mesmo tempo. Microfone, tela e câmera usam minutos do LiveKit enquanto estiverem ligados.</span></div>' +
       '<div class="bc-step"><div class="bc-step-h"><span class="num">1</span><b>Escolha as salas</b><span class="small">' + n + ' de ' + total + ' selecionada' + (n === 1 ? '' : 's') + '</span><span class="spacer"></span>' +
       '<button class="btn btn-sm" data-act="sel-all" type="button">Todas</button><button class="btn btn-sm" data-act="sel-none" type="button">Nenhuma</button></div>' +
       '<div class="bc-rooms">' + S.rooms.map(function (r) {
