@@ -82,6 +82,40 @@
   @keyframes chatpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192, 40, 31, 0.5); } 50% { box-shadow: 0 0 0 6px rgba(192, 40, 31, 0); } }
   @media (prefers-reduced-motion: reduce) { .chat-new .chat-toggle { animation: none; } }
   .endmsg { white-space: pre-line; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tab { font: inherit; font-weight: 600; font-size: 15px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer; min-height: 36px; }
+  .tab.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .tab:focus-visible { outline: 2px solid var(--inter); outline-offset: 2px; }
+  .tab.nudge:not(.on) { animation: tabnudge 1.4s ease-in-out infinite; border-color: var(--call-line); background: var(--call-bg); color: var(--call); }
+  .chat-new #tab-chat:not(.on) { animation: chatpulse 1.2s ease-in-out infinite; background: var(--live); border-color: var(--live); color: var(--on-live); }
+  @keyframes tabnudge { 0%, 100% { box-shadow: 0 0 0 0 rgba(226, 167, 60, 0.7); transform: scale(1); } 50% { box-shadow: 0 0 0 7px rgba(226, 167, 60, 0); transform: scale(1.06); } }
+  @media (prefers-reduced-motion: reduce) { .tab.nudge:not(.on), .chat-new #tab-chat:not(.on) { animation: none; } }
+  .pane { display: flex; flex-direction: column; gap: 12px; }
+  .pane[hidden] { display: none; }
+  .tr-dir { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 14px; }
+  .tr-box { display: flex; flex-direction: column; gap: 6px; }
+  .tr-box textarea { resize: none; width: 100%; box-sizing: border-box; font-size: 16px; }
+  .tr-out { min-height: 64px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 17px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .tr-out:empty::before { content: 'A tradução aparece aqui.'; color: var(--ink-2); font-size: 14px; }
+  .tr-out.err { color: var(--live); font-size: 14px; }
+  .tr-tools { display: flex; gap: 8px; }
+  .tr-tools[hidden] { display: none; }
+  .count { background: var(--call-bg); color: var(--call); border: 2px solid var(--call-line); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 6px 0 12px; }
+  .count[hidden] { display: none; }
+  .count-lbl { font-weight: 600; font-size: 16px; }
+  .count .timer { font-size: 36px; }
+  .lobby { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; margin: 4px 0 14px; max-width: 640px; }
+  .lobby[hidden] { display: none; }
+  .lobby-head h2 { font-size: 15px; font-weight: 600; }
+  .lobby-tiles { grid-template-columns: repeat(auto-fill, minmax(104px, 150px)); gap: 8px; max-height: 340px; overflow-y: auto; justify-content: start; }
+  .lobby-tiles .tile.teacher { order: -2; }
+  .lobby-tiles .tile.me { order: -1; }
+  .lobby-tiles .avatar { width: 40px; height: 40px; font-size: 15px; }
+  .lobby-chat { display: flex; flex-direction: column; gap: 8px; }
+  .lobby-chat .chat-list { height: 150px; }
+  .lobby-chat .chat-form { position: static; margin: 0; padding: 0; }
+  .lobby .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .lobby .controls .btn { white-space: normal; min-height: 44px; padding: 6px 8px; font-size: 14px; }
   .live-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .live-top h1 { font-size: 22px; font-weight: 600; }
   .timer { font-family: var(--font-mono); font-weight: 600; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -115,6 +149,9 @@
     body.in-live .live-side .btn { flex: none; }
     body.in-live .live-side .chat { flex: 1; min-height: 0; padding: 12px; gap: 8px; }
     body.in-live .live-side .chat-body { flex: 1; min-height: 0; }
+    body.in-live .live-side .pane:not([hidden]) { flex: 1; min-height: 0; gap: 8px; }
+    body.in-live .live-side .tr-out { flex: 1; min-height: 40px; overflow-y: auto; }
+    body.in-live .live-side .tr-box:last-child { flex: 1; min-height: 0; }
     body.in-live .live-side .chat-list { flex: 1; height: auto; min-height: 0; }
     body.in-live .live-side .chat-form { position: static; margin: 0; padding: 0; }
   }
@@ -146,10 +183,32 @@
         <h1 id="w-head">Aguardando o professor iniciar a aula</h1>
         <p id="w-sub"></p>
         <p class="small" id="w-note"></p>
+        <div class="count" id="w-count" hidden>
+          <span class="count-lbl">A aula encerra automaticamente em</span>
+          <span class="timer" id="w-count-time" role="timer">05:00</span>
+        </div>
         <div class="themes" id="themes" hidden>
           <h2>Temas sugeridos da aula</h2>
           <ul id="themes-list"></ul>
         </div>
+        <section class="lobby" id="lobby" aria-label="Sala de espera" hidden>
+          <div class="lobby-head"><h2>Quem está na sala de espera <span class="small" id="lobby-count"></span></h2></div>
+          <div class="tiles lobby-tiles" id="lobby-tiles"></div>
+          <div id="lobby-audio" hidden></div>
+          <div class="msg err" id="lb-warn" role="alert" hidden></div>
+          <div class="controls">
+            <button class="btn" id="lb-mic" type="button"></button>
+            <button class="btn" id="lb-cam" type="button"></button>
+          </div>
+          <button class="btn btn-sm" id="lb-sound" type="button" hidden>Ativar o som da sala de espera</button>
+          <div class="lobby-chat">
+            <div class="chat-list" id="lb-chat-list" role="log" aria-live="polite"></div>
+            <form class="chat-form" id="lb-chat-form" autocomplete="off">
+              <input class="input" id="lb-chat-in" maxlength="300" placeholder="Converse com a sala de espera…" aria-label="Mensagem para a sala de espera">
+              <button class="btn btn-primary" type="submit">Enviar</button>
+            </form>
+          </div>
+        </section>
         <div class="game" id="game">
           <canvas id="game-canvas" aria-label="Joguinho: pule os lápis" role="img"></canvas>
           <p class="small" id="game-score">Pontos: 0</p>
@@ -208,15 +267,42 @@
           <button class="btn btn-sm" id="l-cancel" type="button" hidden>Cancelar chamado</button>
           <section class="chat" id="l-chat" aria-label="Chat da sala">
             <div class="chat-head">
-              <h2>Chat da sala</h2>
-              <button class="btn btn-sm chat-toggle" id="l-chat-toggle" type="button" aria-expanded="true">Esconder chat</button>
+              <div class="tabs" role="tablist">
+                <button class="tab on" id="tab-chat" role="tab" aria-selected="true" aria-controls="pane-chat" type="button">Chat da sala</button>
+                <button class="tab tab-tr nudge" id="tab-tr" role="tab" aria-selected="false" aria-controls="pane-tr" type="button">Tradutor</button>
+              </div>
+              <button class="btn btn-sm chat-toggle" id="l-chat-toggle" type="button" aria-expanded="true">Esconder</button>
             </div>
             <div class="chat-body" id="l-chat-body">
-              <div class="chat-list" id="l-chat-list" role="log" aria-live="polite"></div>
-              <form class="chat-form" id="l-chat-form" autocomplete="off">
-                <input class="input" id="l-chat-in" maxlength="300" placeholder="Escreva para a sala…" aria-label="Mensagem para a sala">
-                <button class="btn btn-primary" type="submit">Enviar</button>
-              </form>
+              <div class="pane" id="pane-chat" role="tabpanel">
+                <div class="chat-list" id="l-chat-list" role="log" aria-live="polite"></div>
+                <form class="chat-form" id="l-chat-form" autocomplete="off">
+                  <input class="input" id="l-chat-in" maxlength="300" placeholder="Escreva para a sala…" aria-label="Mensagem para a sala">
+                  <button class="btn btn-primary" type="submit">Enviar</button>
+                </form>
+              </div>
+              <div class="pane" id="pane-tr" role="tabpanel" hidden>
+                <div class="tr-dir">
+                  <span id="tr-from">Português</span>
+                  <button class="btn btn-sm" id="tr-swap" type="button" aria-label="Inverter os idiomas">&#8644;</button>
+                  <span id="tr-to">Inglês</span>
+                </div>
+                <div class="tr-box">
+                  <textarea class="input" id="tr-in" rows="3" maxlength="450" placeholder="Escreva aqui em português…" aria-label="Texto para traduzir"></textarea>
+                  <div class="tr-tools" id="tr-in-tools" hidden>
+                    <button class="btn btn-sm" data-tr="copy" data-box="in" type="button">Copiar</button>
+                    <button class="btn btn-sm" data-tr="say" data-box="in" type="button">Ouvir</button>
+                  </div>
+                </div>
+                <button class="btn btn-primary" id="tr-go" type="button">Traduzir</button>
+                <div class="tr-box">
+                  <div class="tr-out" id="tr-out" aria-live="polite" tabindex="0"></div>
+                  <div class="tr-tools" id="tr-out-tools" hidden>
+                    <button class="btn btn-sm" data-tr="copy" data-box="out" type="button">Copiar</button>
+                    <button class="btn btn-sm" data-tr="say" data-box="out" type="button">Ouvir</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
         </div>

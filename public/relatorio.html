@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<script>try{var t=localStorage.getItem("salas:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>Relatório da aula</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="/shared.css">
+<style>
+  .rp { max-width: 980px; margin: 0 auto; padding: 44px 0 40px; display: flex; flex-direction: column; gap: 16px; }
+  .rp h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; }
+  .rp h2 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+  .head { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: flex-start; justify-content: space-between; }
+  .sub { color: var(--ink-2); font-size: 14px; margin-top: 4px; }
+  .badge2 { display: inline-block; border-radius: 999px; padding: 2px 12px; font-size: 13px; font-weight: 600; background: var(--call-bg); color: var(--call); border: 1px solid var(--call-line); }
+  .badge2.done { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat b { display: block; font-family: var(--font-mono); font-size: 30px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--ink-2); font-size: 13px; }
+  .stat.bad b { color: var(--live); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); font-weight: 600; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .lv { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 12px; font-weight: 600; }
+  .lv.b { background: var(--basic-bg); color: var(--basic); }
+  .lv.i { background: var(--inter-bg); color: var(--inter); }
+  .scroll { overflow-x: auto; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .note { font-size: 13px; color: var(--ink-2); }
+  @media print { .actions, .topctl { display: none !important; } body { background: #fff; } }
+</style>
+</head>
+<body>
+<main class="rp" id="rp"><p class="small">Carregando relatório…</p></main>
+<script src="/shared.js"></script>
+<script>
+(function () {
+  'use strict';
+  var A = App, esc = A.esc;
+  var id = location.pathname.split('/').filter(Boolean)[1] || '';
+  var root = document.getElementById('rp');
+  var TZ = 'America/Sao_Paulo';
+  function dt(ms) { return ms ? new Date(ms).toLocaleString('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'; }
+  function hm(ms) { return ms ? new Date(ms).toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'; }
+  function dur(a, b) {
+    if (!a || !b) return '—';
+    var s = Math.max(0, Math.round((b - a) / 1000));
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return (h ? h + ' h ' : '') + m + ' min' + (h ? '' : ' ' + sec + ' s');
+  }
+  var timer = null;
+  function paint(r) {
+    var T = r.totals;
+    var done = r.phase === 'done';
+    var closed = r.closedBy === 'auto' ? 'encerrada automaticamente após o tempo de encerramento' : (r.closedBy === 'professor' ? 'encerrada pelo professor' : '');
+    var kinds = Object.keys(r.problems.byKind || {}).sort(function (a, b) { return r.problems.byKind[b] - r.problems.byKind[a]; });
+    var h = '<div class="head"><div><p class="eyebrow">Relatório da aula</p><h1>' + esc(r.title) + '</h1>' +
+      '<p class="sub">' + (done ? '<span class="badge2 done">Aula finalizada</span>' : '<span class="badge2">Em andamento (atualiza sozinho)</span>') + (closed ? ' · ' + closed : '') + '</p></div>' +
+      '<div class="actions"><button class="btn btn-sm" id="copy" type="button">Copiar link do relatório</button><button class="btn btn-sm" id="print" type="button">Imprimir / salvar PDF</button></div></div>';
+    h += '<div class="grid">' +
+      '<div class="stat"><b>' + T.joined + '</b><span>alunos entraram na aula</span></div>' +
+      '<div class="stat"><b>' + T.attended + '</b><span>participaram de ao menos uma rodada</span></div>' +
+      '<div class="stat"><b>' + T.basico + ' / ' + T.intermediario + '</b><span>Básico / Intermediário (todos que entraram)</span></div>' +
+      '<div class="stat"><b>' + T.attendedBasico + ' / ' + T.attendedIntermediario + '</b><span>Básico / Intermediário (participaram)</span></div>' +
+      '<div class="stat"><b>' + hm(r.startedAt) + '</b><span>início da 1ª rodada</span></div>' +
+      '<div class="stat"><b>' + hm(r.endedAt) + '</b><span>fim da aula</span></div>' +
+      '<div class="stat"><b>' + dur(r.startedAt, r.endedAt) + '</b><span>duração (do início da 1ª rodada ao fim)</span></div>' +
+      '<div class="stat' + (r.problems.total ? ' bad' : '') + '"><b>' + r.problems.total + '</b><span>problemas de conexão registrados</span></div></div>';
+    if (T.onlyWaiting || T.late) {
+      h += '<p class="note">' + (T.onlyWaiting ? T.onlyWaiting + ' aluno' + (T.onlyWaiting === 1 ? '' : 's') + ' entrou' + (T.onlyWaiting === 1 ? '' : 'ram') + ' mas ficou só na sala de espera. ' : '') +
+        (T.late ? T.late + ' entrou' + (T.late === 1 ? '' : 'ram') + ' depois do início (liberado pelo professor).' : '') + '</p>';
+    }
+    h += '<div class="card"><h2>Rodadas</h2><div class="scroll"><table><thead><tr><th>Rodada</th><th>Início</th><th>Fim</th><th class="n">Duração</th></tr></thead><tbody>' +
+      (r.rounds.length ? r.rounds.map(function (x) { return '<tr><td>Rodada ' + x.n + '</td><td>' + dt(x.startedAt) + '</td><td>' + (x.endedAt ? dt(x.endedAt) : 'em andamento') + '</td><td class="n">' + dur(x.startedAt, x.endedAt) + '</td></tr>'; }).join('') : '<tr><td colspan="4">A primeira rodada ainda não começou.</td></tr>') +
+      '</tbody></table></div></div>';
+    h += '<div class="card"><h2>Alunos (' + r.students.length + ')</h2><div class="scroll"><table><thead><tr><th>Nome</th><th>Nível</th><th>Entrou às</th><th class="n">Rodadas</th></tr></thead><tbody>' +
+      r.students.map(function (s) {
+        return '<tr><td>' + esc(s.name) + (s.late ? ' <span class="small">(entrou depois do início)</span>' : '') + '</td><td><span class="lv ' + (s.level === 'basico' ? 'b' : 'i') + '">' + A.LEVEL_NAME[s.level] + '</span></td><td>' + hm(s.joinedAt) + '</td><td class="n">' + (s.rounds.length ? s.rounds.join(' e ') : 'só sala de espera') + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>';
+    h += '<div class="card"><h2>Problemas de conexão (' + r.problems.total + ')</h2>';
+    if (!r.problems.total) h += '<p>Nenhum problema de conexão registrado. 🎉</p>';
+    else {
+      h += '<div class="scroll"><table><thead><tr><th>Tipo</th><th class="n">Quantidade</th></tr></thead><tbody>' +
+        kinds.map(function (k) { return '<tr><td>' + esc(r.problems.labels[k] || k) + '</td><td class="n">' + r.problems.byKind[k] + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+        '<h2 style="margin-top:14px">Últimos registros</h2><div class="scroll"><table><thead><tr><th>Hora</th><th>Tipo</th><th>Quem</th></tr></thead><tbody>' +
+        r.problems.list.slice().reverse().map(function (p) { return '<tr><td>' + hm(p.at) + '</td><td>' + esc(r.problems.labels[p.kind] || p.kind) + '</td><td>' + esc(p.who || '—') + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+        '<p class="note" style="margin-top:8px">Contam quedas de conexão com o servidor, falhas e reconexões na sala de vídeo e momentos de conexão ruim detectados pelo LiveKit. Um aluno com internet instável pode gerar vários registros.</p>';
+    }
+    h += '</div><p class="note">Gerado em ' + dt(r.updatedAt) + ' (horário de Brasília).</p>';
+    root.innerHTML = h;
+    document.title = 'Relatório · ' + r.title;
+    document.getElementById('copy').addEventListener('click', function () {
+      var b = this;
+      A.copyText(location.href).then(function (ok) { var o = b.textContent; b.textContent = ok ? 'Link copiado!' : 'Copie o endereço da página'; setTimeout(function () { b.textContent = o; }, 1800); });
+    });
+    document.getElementById('print').addEventListener('click', function () { window.print(); });
+  }
+  function load() {
+    A.api('GET', '/api/relatorio/' + encodeURIComponent(id)).then(function (r) {
+      paint(r);
+      clearTimeout(timer);
+      if (r.phase !== 'done') timer = setTimeout(load, 15000);
+    }, function (e) {
+      root.innerHTML = '<div class="card"><h1>Relatório não encontrado</h1><p>' + esc(e.message) + '</p></div>';
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>

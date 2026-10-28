@@ -125,5 +125,32 @@ window.App = (function () {
   }
   initTheme();
 
-  return { LEVEL_NAME: LEVEL_NAME, LEVEL_CLS: LEVEL_CLS, ICON: ICON, esc: esc, initials: initials, mmss: mmss, api: api, connectWS: connectWS, copyText: copyText, topctl: topctl };
+  // Alerta visual dos últimos 30 segundos de qualquer contagem regressiva:
+  // faixa vermelha grande no topo + borda da tela piscando. urgent('texto') liga, urgent(null) desliga.
+  var urgentEl = null;
+  function urgent(text) {
+    if (!urgentEl) {
+      urgentEl = document.createElement('div');
+      urgentEl.className = 'urgent-banner';
+      urgentEl.setAttribute('role', 'alert');
+      urgentEl.hidden = true;
+      document.body.appendChild(urgentEl);
+    }
+    if (text) {
+      if (urgentEl.textContent !== text) urgentEl.textContent = text;
+      urgentEl.hidden = false;
+      document.body.classList.add('urgent');
+    } else {
+      urgentEl.hidden = true;
+      document.body.classList.remove('urgent');
+    }
+  }
+  // texto do alerta para o tempo restante (em segundos), ou null se ainda não é hora
+  function urgentText(left, what) {
+    if (left > 30 || left <= 0) return null;
+    var n = Math.ceil(left);
+    return 'Faltam ' + n + (n === 1 ? ' segundo' : ' segundos') + ' ' + what;
+  }
+
+  return { urgent: urgent, urgentText: urgentText, LEVEL_NAME: LEVEL_NAME, LEVEL_CLS: LEVEL_CLS, ICON: ICON, esc: esc, initials: initials, mmss: mmss, api: api, connectWS: connectWS, copyText: copyText, topctl: topctl };
 })();

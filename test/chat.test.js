@@ -53,7 +53,11 @@ test('chat por sala, mensagens do professor, microfone e mensagem final', () => 
   C.endRound(c);
   assert.deepStrictEqual(c.bmic, []);
   C.endRound(c);
-  assert.throws(() => C.studentSay(c, list[0], 'oi'), /rodada/);
+  assert.strictEqual(c.phase, 'between');
+  list[0].chatAt = 0;
+  assert.strictEqual(C.studentSay(c, list[0], 'oi').roomId, 'lobby', 'fora da rodada o chat é o da sala de espera');
+  C.endClass(c);
+  assert.throws(() => C.studentSay(c, list[0], 'oi'), /terminou/);
 });
 
 test('nomes que se passam pelo professor são recusados', () => {

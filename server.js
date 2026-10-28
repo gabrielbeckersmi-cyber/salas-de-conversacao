@@ -8,6 +8,8 @@ const { WebSocketServer } = require('ws');
 const { AccessToken } = require('livekit-server-sdk');
 const C = require('./lib/classes');
 const auth = require('./lib/auth');
+const R = require('./lib/report');
+const { ReportStore } = require('./lib/reportstore');
 
 function build(env) {
   const cfg = {
@@ -18,6 +20,8 @@ function build(env) {
     password: env.PROFESSOR_PASSWORD || '',
     dataFile: env.DATA_FILE || path.join(__dirname, 'data', 'classes.json'),
     retentionDays: Number(env.RETENTION_DAYS || 30),
+    reportsFile: env.REPORTS_FILE || '',
+    serviceAccount: env.FIREBASE_SERVICE_ACCOUNT || '',
     firebaseUrl: env.FIREBASE_DB_URL === undefined ? 'https://app-conversacao-default-rtdb.firebaseio.com' : env.FIREBASE_DB_URL
   };
   cfg.sessionSecret = env.SESSION_SECRET ||
@@ -25,6 +29,11 @@ function build(env) {
   const lkReady = !!(cfg.lkUrl && cfg.lkKey && cfg.lkSecret);
 
   const store = {};
+  const reports = new ReportStore({
+    file: cfg.reportsFile || path.join(path.dirname(cfg.dataFile), 'reports.json'),
+    firebaseUrl: cfg.firebaseUrl,
+    serviceAccount: cfg.serviceAccount
+  });
   const PUBLIC = path.join(__dirname, 'public');
   const LK_CLIENT = path.join(__dirname, 'node_modules', 'livekit-client', 'dist', 'livekit-client.umd.js');
 
@@ -75,17 +84,28 @@ function build(env) {
   }
   function lkRoomName(c, roomId) { return c.id + '-r' + c.round + '-' + roomId; }
 
-  async function teacherSnapshot(c) {
+  function lobbyRoomName(c) { return c.id + '-lobby'; }
+  function cleanTid(t) { return /^[a-z0-9]{4,16}$/i.test(String(t || '')) ? String(t) : 'x'; }
+
+  // Cada professor conectado usa uma identidade própria no LiveKit (prof-<id>).
+  // Com a mesma identidade, o LiveKit derruba o professor anterior e o áudio ficava cortando.
+  async function teacherSnapshot(c, tid) {
     const v = C.teacherView(c);
+    const identity = 'prof-' + cleanTid(tid);
     v.lk = { url: cfg.lkUrl };
     v.link = '/aula/' + c.id;
+    v.report = '/relatorio/' + c.id;
     if (C.isLive(c)) {
       for (const r of v.rooms) {
         const room = lkRoomName(c, r.id);
         try {
-          r.lk = { room: room, token: await lkToken({ identity: 'professor', name: 'Professor', room: room }) };
+          r.lk = { room: room, token: await lkToken({ identity: identity, name: 'Professor', room: room }) };
         } catch (e) { r.lkError = e.message; }
       }
+    }
+    if (c.phase !== 'done') {
+      const room = lobbyRoomName(c);
+      try { v.lobby = { room: room, token: await lkToken({ identity: identity, name: 'Professor', room: room }) }; } catch (e) { v.lobbyError = e.message; }
     }
     return v;
   }
@@ -96,6 +116,12 @@ function build(env) {
       try {
         v.room.lk = { url: cfg.lkUrl, room: room, token: await lkToken({ identity: s.pid, name: s.name, room: room }) };
       } catch (e) { v.room.lkError = e.message; }
+    } else if (c.phase !== 'done') {
+      // sem sala (espera, intervalo, encerramento): vai para a sala de espera em vídeo
+      const room = lobbyRoomName(c);
+      try {
+        v.lobby = { url: cfg.lkUrl, room: room, token: await lkToken({ identity: s.pid, name: s.name, room: room }) };
+      } catch (e) { v.lobbyError = e.message; }
     }
     return v;
   }
@@ -109,9 +135,27 @@ function build(env) {
   function send(ws, msg) {
     if (ws.readyState === 1) ws.send(JSON.stringify(msg));
   }
+  // relatório: atualizado no máximo a cada 20 s durante a aula e na hora quando algo importante acontece
+  const reportAt = new Map();
+  function reportNow(c) {
+    if (!c.startedAt) return;
+    reportAt.set(c.id, Date.now());
+    reports.put(R.buildReport(c), true).catch(function () { /* ignorar */ });
+  }
+  const reportTrail = new Map();
+  function reportSoon(c) {
+    if (!c.startedAt || c.phase === 'done') return;
+    const wait = 20000 - (Date.now() - (reportAt.get(c.id) || 0));
+    if (wait <= 0) { reportNow(c); return; }
+    if (reportTrail.has(c.id)) return;
+    const t = setTimeout(function () { reportTrail.delete(c.id); reportNow(c); }, wait);
+    if (t.unref) t.unref();
+    reportTrail.set(c.id, t);
+  }
   const pending = new Map();
   function schedule(c) {
     save();
+    reportSoon(c);
     if (pending.has(c.id)) return;
     pending.set(c.id, setTimeout(function () {
       pending.delete(c.id);
@@ -121,9 +165,9 @@ function build(env) {
   async function pushAll(c) {
     const r = registry.get(c.id);
     if (!r) return;
-    if (r.teachers.size) {
-      const snap = await teacherSnapshot(c);
-      r.teachers.forEach(function (ws) { send(ws, { type: 'state', data: snap }); });
+    for (const ws of Array.from(r.teachers)) {
+      const snap = await teacherSnapshot(c, ws.tid);
+      send(ws, { type: 'state', data: snap });
     }
     for (const [sid, set] of r.students) {
       const s = c.students[sid];
@@ -149,12 +193,13 @@ function build(env) {
   function armTimer(c) {
     clearTimeout(timers.get(c.id));
     timers.delete(c.id);
-    if (!C.isLive(c) || !c.endsAt) return;
+    if (!(C.isLive(c) || c.phase === 'closing') || !c.endsAt) return;
     const ms = Math.max(0, c.endsAt - Date.now());
     timers.set(c.id, setTimeout(function () {
-      C.endRound(c);
+      C.timeUp(c);
       armTimer(c);
       schedule(c);
+      reportNow(c);
     }, ms));
   }
 
@@ -184,7 +229,7 @@ function build(env) {
     return c;
   }
 
-  app.get('/healthz', function (req, res) { res.json({ ok: true, livekit: lkReady }); });
+  app.get('/healthz', function (req, res) { res.json({ ok: true, livekit: lkReady, relatorios: reports.mode, relatoriosErro: reports.lastError || undefined }); });
 
   app.get('/vendor/livekit-client.umd.js', function (req, res) {
     res.set('Cache-Control', 'public, max-age=86400');
@@ -214,7 +259,14 @@ function build(env) {
     const r = reg(c.id);
     const out = [];
     const room = c.rooms.find(function (x) { return x.id === roomId; });
-    if (room) room.members.forEach(function (pid) {
+    if (roomId === 'lobby') {
+      // sala de espera: quem não está em uma sala ao vivo
+      C.studentList(c).forEach(function (st) {
+        if (C.isLive(c) && C.roomOf(c, st.pid)) return;
+        const set = r.students.get(st.id);
+        if (set) set.forEach(function (ws) { out.push(ws); });
+      });
+    } else if (room) room.members.forEach(function (pid) {
       const st = C.byPid(c, pid);
       const set = st && r.students.get(st.id);
       if (set) set.forEach(function (ws) { out.push(ws); });
@@ -241,13 +293,14 @@ function build(env) {
     const s = c.students[String(req.query.studentId)];
     if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.');
     const room = C.isLive(c) ? C.roomOf(c, s.pid) : null;
-    res.json({ roomId: room ? room.id : null, messages: room ? C.chatHistory(c, room.id) : [] });
+    res.json({ roomId: room ? room.id : null, messages: room ? C.chatHistory(c, room.id) : [], lobby: C.chatHistory(c, 'lobby') });
   });
 
   app.get('/api/professor/classes/:id/chat', needTeacher, function (req, res) {
     const c = getClass(req.params.id);
     const rooms = {};
     c.rooms.forEach(function (r) { rooms[r.id] = C.chatHistory(c, r.id); });
+    rooms.lobby = C.chatHistory(c, 'lobby');
     res.json({ rooms: rooms });
   });
 
@@ -294,6 +347,59 @@ function build(env) {
     res.json(temasCache.v);
   });
 
+  // problemas de conexão avisados pelo navegador (alimentam o relatório)
+  const PROBLEM_KINDS = ['video-falhou', 'video-caiu', 'video-reconectando', 'qualidade-ruim'];
+  const problemAt = new Map();
+  function noteProblem(c, kind, who, minGapMs) {
+    if (c.phase === 'done') return;
+    const k = c.id + '|' + kind + '|' + who;
+    const now = Date.now();
+    if (now - (problemAt.get(k) || 0) < (minGapMs || 15000)) return;
+    problemAt.set(k, now);
+    if (problemAt.size > 20000) problemAt.clear();
+    C.logProblem(c, kind, who, now);
+    reportSoon(c);
+  }
+  app.post('/api/classes/:id/problem', function (req, res) {
+    const c = getClass(req.params.id);
+    const s = c.students[String(req.body.studentId)];
+    const kind = String(req.body.kind || '');
+    if (s && PROBLEM_KINDS.indexOf(kind) !== -1) noteProblem(c, kind, s.name, 20000);
+    res.json({ ok: true });
+  });
+  app.post('/api/professor/classes/:id/problem', needTeacher, function (req, res) {
+    const c = getClass(req.params.id);
+    const kind = String(req.body.kind || '');
+    if (PROBLEM_KINDS.indexOf(kind) !== -1) noteProblem(c, kind, 'Professor', 20000);
+    res.json({ ok: true });
+  });
+
+  // relatório: público por link (o código da aula é impossível de adivinhar); a lista completa exige login
+  app.get('/relatorio/:id', function (req, res) { res.sendFile(path.join(PUBLIC, 'relatorio.html')); });
+  app.get('/relatorios', function (req, res) { res.sendFile(path.join(PUBLIC, 'relatorios.html')); });
+  app.get('/api/relatorio/:id', async function (req, res) {
+    const live = store[String(req.params.id)];
+    let rep = null;
+    if (live && live.startedAt) rep = R.buildReport(live); // aula em memória: sempre o dado mais novo
+    if (!rep) rep = await reports.get(req.params.id);
+    if (!rep) throw new C.AppError(404, 'report', 'Relatório não encontrado. Ele só existe para aulas que chegaram a começar.');
+    res.set('Cache-Control', 'no-store');
+    res.json(rep);
+  });
+  app.get('/api/professor/relatorios', needTeacher, async function (req, res) {
+    const list = await reports.list();
+    Object.keys(store).forEach(function (id) {
+      const c = store[id];
+      if (c.startedAt && !list.some(function (r) { return r.id === id; })) list.push(R.buildReport(c));
+    });
+    res.json({
+      mode: reports.mode,
+      error: reports.lastError,
+      reports: list.map(function (r) { return { id: r.id, title: r.title, startedAt: r.startedAt, endedAt: r.endedAt, phase: r.phase, totals: r.totals, problems: r.problems && r.problems.total }; })
+        .sort(function (a, b) { return (b.startedAt || 0) - (a.startedAt || 0); })
+    });
+  });
+
   app.post('/api/classes/:id/call', function (req, res) {
     const c = getClass(req.params.id);
     const s = c.students[String(req.body.studentId)];
@@ -328,7 +434,7 @@ function build(env) {
   });
 
   app.get('/api/professor/classes/:id', needTeacher, async function (req, res) {
-    res.json(await teacherSnapshot(getClass(req.params.id)));
+    res.json(await teacherSnapshot(getClass(req.params.id), req.query.tid));
   });
 
   app.post('/api/professor/classes/:id/act', needTeacher, function (req, res) {
@@ -341,9 +447,9 @@ function build(env) {
       case 'remove-room': C.removeRoom(c, b.roomId); break;
       case 'start':
         if (!lkReady) throw new C.AppError(500, 'livekit', 'LiveKit não configurado no servidor (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET).');
-        C.startRound(c); armTimer(c); break;
-      case 'end-round': C.endRound(c); armTimer(c); break;
-      case 'end-class': C.endClass(c); armTimer(c); break;
+        C.startRound(c); armTimer(c); reportNow(c); break;
+      case 'end-round': C.endRound(c); armTimer(c); reportNow(c); break;
+      case 'end-class': C.endClass(c, 'professor'); armTimer(c); reportNow(c); break;
       case 'hear': C.setHear(c, b.roomId, b.mode); break;
       case 'answer': C.answerCall(c, b.roomId); break;
       case 'bmic': C.setBroadcastMic(c, b.roomIds); break;
@@ -390,9 +496,13 @@ function build(env) {
       const p = auth.verify(cfg.sessionSecret, u.searchParams.get('token'));
       if (!p || p.role !== 'teacher') { send(ws, { type: 'error', code: 'auth', message: 'Sessão expirada.' }); ws.close(4001); return; }
       const r = reg(c.id);
+      ws.tid = cleanTid(u.searchParams.get('tid'));
       r.teachers.add(ws);
-      ws.on('close', function () { r.teachers.delete(ws); });
-      teacherSnapshot(c).then(function (snap) { send(ws, { type: 'state', data: snap }); });
+      ws.on('close', function (code) {
+        r.teachers.delete(ws);
+        if ((code === 1006 || ws.hbKilled) && c.phase !== 'done') { C.logProblem(c, 'professor-caiu', 'Professor'); reportSoon(c); }
+      });
+      teacherSnapshot(c, ws.tid).then(function (snap) { send(ws, { type: 'state', data: snap }); });
       return;
     }
 
@@ -404,7 +514,11 @@ function build(env) {
     r.students.get(sid).add(ws);
     C.setOnline(c, sid, true);
     if (C.isLive(c) && !C.roomOf(c, s.pid) && !s.late) C.placeStudentLive(c, s); // quem entrou depois (liberado pelo professor) espera em "Sem sala"
-    ws.on('close', function () {
+    ws.on('close', function (code) {
+      // queda de verdade (não foi o botão Sair nem fechar a página): vai para o relatório
+      if ((code === 1006 || ws.hbKilled) && c.phase !== 'done' && c.students[sid]) {
+        noteProblem(c, ws.hbKilled ? 'aluno-timeout' : 'aluno-caiu', s.name, 8000);
+      }
       const set = r.students.get(sid);
       if (set) {
         set.delete(ws);
@@ -418,7 +532,7 @@ function build(env) {
   const heartbeat = setInterval(function () {
     wss.clients.forEach(function (ws) {
       if (ws.isAlive) ws.missed = 0; else ws.missed = (ws.missed || 0) + 1;
-      if (ws.missed >= 2) { ws.terminate(); return; } // sem resposta por ~10 s: conexão perdida
+      if (ws.missed >= 2) { ws.hbKilled = true; ws.terminate(); return; } // sem resposta por ~10 s: conexão perdida
       ws.isAlive = false;
       try { ws.ping(); } catch (e) { /* ignorar */ }
     });
@@ -427,10 +541,13 @@ function build(env) {
 
   function listen(port) {
     load();
+    reports.load();
     Object.keys(store).forEach(function (id) {
       const c = store[id];
-      if (C.isLive(c) && c.endsAt && c.endsAt <= Date.now()) C.endRound(c);
+      if (c.startedAt && c.phase !== 'done') C.logProblem(c, 'servidor-reiniciou', '');
+      if ((C.isLive(c) || c.phase === 'closing') && c.endsAt && c.endsAt <= Date.now()) C.timeUp(c);
       armTimer(c);
+      if (c.startedAt) reportNow(c);
     });
     return new Promise(function (resolve) {
       server.listen(port === undefined ? cfg.port : port, function () { resolve(server.address().port); });

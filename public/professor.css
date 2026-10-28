@@ -178,3 +178,9 @@
 .temas .tema { background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; font-size: 14px; font-weight: 600; }
 .statsrow .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .btn.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+
+/* sala de espera do professor */
+.lobbycard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.lobbycard.on { border-color: var(--primary); }
+.lobbycard .lobby-tiles { grid-template-columns: repeat(auto-fill, minmax(120px, 170px)); justify-content: start; }
+.topbar .actions { display: flex; gap: 8px; flex-wrap: wrap; }

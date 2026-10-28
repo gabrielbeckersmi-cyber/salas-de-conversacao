@@ -12,6 +12,9 @@
   try { token = localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { token = ''; }
   var parts = location.pathname.split('/').filter(Boolean);
   var classId = parts[1] || null;
+  // identidade única deste professor no LiveKit (dois professores na mesma sala não podem repetir a identidade)
+  var tid = Math.random().toString(36).slice(2, 10) || 'abcdef';
+  function isProf(id) { return /^prof-/.test(String(id)); }
 
   var NAME_KEY = 'salas:profname';
   var DEV_KEY = 'salas:profdev';
@@ -64,7 +67,8 @@
   var views = new Map();   // roomId -> RoomView (uma conexão LiveKit por sala)
   var ui = {
     n: null, confirm: null, warn: '', net: false, watch: new Set(),
-    camRoom: null,           // sala em que o professor aparece na câmera (só uma)
+    camRooms: new Set(),     // salas em que o professor aparece na câmera (pode ser várias ao mesmo tempo)
+    lobbyOn: false, lobbyWatch: false, lobbyListen: true, lobbyTalk: false, lobbyCam: false,   // sala de espera
     sel: new Set(),          // salas escolhidas para transmissão (microfone, tela, mensagem)
     share: null,             // { stream, rooms:Set } quando a tela está sendo compartilhada
     chat: {},                // roomId -> mensagens
@@ -112,14 +116,14 @@
   }
 
   // ======================================================== lista de aulas
-  var PHASE_TEXT = { lobby: 'Aberta para entrada', r1: 'Rodada 1 ao vivo', between: 'Intervalo', r2: 'Rodada 2 ao vivo', done: 'Encerrada' };
+  var PHASE_TEXT = { lobby: 'Aberta para entrada', r1: 'Rodada 1 ao vivo', between: 'Intervalo', r2: 'Rodada 2 ao vivo', closing: 'Encerramento', done: 'Encerrada' };
 
   function viewList() {
     app.innerHTML = '<p class="small">Carregando…</p>';
     T('GET', '/api/professor/classes').then(function (r) {
       var d = new Date();
       var def = 'Aula de conversação · ' + String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
-      app.innerHTML = '<div class="topbar"><div><h1>Salas de Conversação</h1><p class="sub">Painel do professor</p></div><button class="btn btn-sm" data-act="logout" type="button">Sair</button></div>' +
+      app.innerHTML = '<div class="topbar"><div><h1>Salas de Conversação</h1><p class="sub">Painel do professor</p></div><span class="actions"><a class="btn btn-sm" href="/relatorios">Relatórios</a><button class="btn btn-sm" data-act="logout" type="button">Sair</button></span></div>' +
         '<div id="set-slot"></div>' +
         (r.livekit ? '' : '<div class="msg err">O servidor ainda não tem o LiveKit configurado (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET). Sem isso a aula não consegue começar.</div>') +
         '<form class="card" id="new-class" novalidate><h2>Nova aula</h2>' +
@@ -147,14 +151,15 @@
       '<span class="' + cls + '">' + PHASE_TEXT[c.phase] + '</span></div>' +
       '<div class="linkrow"><input class="input" readonly value="' + esc(url) + '" aria-label="Link da aula para os alunos">' +
       '<button class="btn btn-sm" data-act="copy-row" data-url="' + esc(url) + '" type="button">' + A.ICON.link + 'Copiar link</button>' +
-      '<a class="btn btn-primary btn-sm" href="/professor/' + c.id + '">Abrir painel</a></div></div>';
+      '<a class="btn btn-primary btn-sm" href="/professor/' + c.id + '">Abrir painel</a>' +
+      (c.startedAt ? '<a class="btn btn-sm" href="/relatorio/' + c.id + '" target="_blank" rel="noopener">Relatório</a>' : '') + '</div></div>';
   }
 
   // ======================================================== painel da aula
   var netTimer = null;
   function viewPanel() {
     app.innerHTML = '<p class="small">Conectando à aula…</p>';
-    ws = A.connectWS('/ws?role=teacher&class=' + encodeURIComponent(classId) + '&token=' + encodeURIComponent(token), {
+    ws = A.connectWS('/ws?role=teacher&class=' + encodeURIComponent(classId) + '&token=' + encodeURIComponent(token) + '&tid=' + tid, {
       onOpen: function () { clearTimeout(netTimer); ui.fetched = -1; if (S) fetchChat(); if (ui.net) { ui.net = false; render(); } },
       onMessage: function (m) {
         if (m.type === 'state') { S = m.data; offset = S.now - Date.now(); onState(); }
@@ -170,17 +175,22 @@
 
   function onState() {
     if (S.round !== ui.round) {                     // nova rodada: salas novas, chat novo
-      ui.round = S.round; ui.chat = {}; ui.unread = {}; ui.chatRoom = null; ui.sel.clear(); ui.fetched = -1;
+      var lobbyChat = ui.chat.lobby; var lobbyUnread = ui.unread.lobby;
+      ui.round = S.round; ui.chat = {}; ui.unread = {}; ui.sel.clear(); ui.fetched = -1;
+      if (ui.chatRoom !== 'lobby') ui.chatRoom = null;
+      if (lobbyChat) ui.chat.lobby = lobbyChat;
+      if (lobbyUnread) ui.unread.lobby = lobbyUnread;
     }
-    if (!isLive()) { if (ui.share) stopShareQuiet(); ui.chatRoom = null; ui.camRoom = null; ui.sel.clear(); }
-    if (ui.camRoom && !S.rooms.some(function (r) { return r.id === ui.camRoom; })) ui.camRoom = null;
+    if (!isLive()) { if (ui.share) stopShareQuiet(); if (ui.chatRoom !== 'lobby') ui.chatRoom = null; ui.camRooms.clear(); ui.sel.clear(); }
+    if (S.phase === 'done') { ui.lobbyOn = false; ui.chatRoom = null; }
+    ui.camRooms.forEach(function (id) { if (!S.rooms.some(function (r) { return r.id === id; })) ui.camRooms.delete(id); });
     var ids = new Set(S.rooms.map(function (r) { return r.id; }));
     ui.sel.forEach(function (id) { if (!ids.has(id)) ui.sel.delete(id); });
     if (ui.share) { ui.share.rooms.forEach(function (id) { if (!ids.has(id)) ui.share.rooms.delete(id); }); if (!ui.share.rooms.size) stopShareQuiet(); }
     syncViews();
     applyHear();
     render();
-    if (isLive() && ui.fetched !== S.round) fetchChat();
+    if (ui.fetched !== S.round) fetchChat();
     ensureEm();
   }
 
@@ -207,6 +217,42 @@
     document.querySelectorAll('.tile[data-room="' + view.id + '"]').forEach(function (t) { paintTile(view, t.getAttribute('data-pid')); });
   }
 
+  // problemas de conexão do professor (entram no relatório)
+  function reportProblem(kind) {
+    T('POST', '/api/professor/classes/' + classId + '/problem', { kind: kind }).catch(function () { /* ignorar */ });
+  }
+
+  // Uma única captura da câmera serve a todas as salas: cada sala recebe uma cópia da imagem.
+  var camShared = { stream: null, pending: null };
+  function acquireCam() {
+    var cur = camShared.stream && camShared.stream.getVideoTracks()[0];
+    if (cur && cur.readyState === 'live') return Promise.resolve(camShared.stream);
+    if (camShared.pending) return camShared.pending;
+    camShared.pending = (async function () {
+      var id = await resolveCam();
+      var base = { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24 } };
+      var st;
+      try { st = await navigator.mediaDevices.getUserMedia({ video: id ? Object.assign({ deviceId: { exact: id } }, base) : base }); }
+      catch (e) { if (!id) throw e; st = await navigator.mediaDevices.getUserMedia({ video: base }); }
+      camShared.stream = st;
+      return st;
+    })();
+    var clear = function () { camShared.pending = null; };
+    camShared.pending.then(clear, clear);
+    return camShared.pending;
+  }
+  function releaseCamIfUnused() {
+    var used = false;
+    views.forEach(function (v) { if (!v.dead && v.camOn) used = true; });
+    if (used || !camShared.stream) return;
+    camShared.stream.getTracks().forEach(function (t) { t.stop(); });
+    camShared.stream = null;
+  }
+  function restartCam() {                       // trocou de câmera nas configurações
+    if (camShared.stream) { camShared.stream.getTracks().forEach(function (t) { t.stop(); }); camShared.stream = null; }
+    views.forEach(function (v) { if (v.camOn && v.connected) v.setCam(true, true); });
+  }
+
   class RoomView {
     constructor(r) {
       this.id = r.id;
@@ -221,6 +267,7 @@
       this.shareStream = null;
       this.shareTrack = null;
       this.camOn = false;
+      this.camTrack = null;
       this.videos = new Map();
       this.videoOn = new Set();
       this.videoOff = new Set();
@@ -250,6 +297,7 @@
       room.on(E.Disconnected, function () {
         if (self.dead || self.room !== room) return;
         self.connected = false;
+        reportProblem('video-caiu');
         clearTimeout(self.rt);
         self.rt = setTimeout(function () { self.connect(); }, 3000);
       });
@@ -260,17 +308,19 @@
           p.trackPublications.forEach(function (pub) { self.onPub(pub, p); });
         });
         self.shareTrack = null;
+        self.camTrack = null;
         if (self.camOn) self.setCam(true);
         if (self.talking) self.setTalking(true);
         if (self.shareStream) self.setShare(self.shareStream);
       }, function () {
         if (self.dead) return;
+        reportProblem('video-falhou');
         clearTimeout(self.rt);
         self.rt = setTimeout(function () { self.connect(); }, 3000);
       });
     }
     onPub(pub, p) {
-      if (p.identity === 'professor') return;
+      if (isProf(p.identity)) return;
       if (pub.kind === 'video') pub.setSubscribed(this.watching);
       else if (pub.kind === 'audio') pub.setSubscribed(this.listening);
     }
@@ -350,18 +400,31 @@
         if (on) { ui.warn = 'Não consegui usar o microfone. Libere a permissão do navegador (cadeado ao lado do endereço) e tente de novo.'; render(); }
       });
     }
-    setCam(on) {
+    setCam(on, force) {
       var self = this;
       this.camOn = on;
       this.chain = this.chain.then(async function () {
         if (!self.connected) return null;
         var lp = self.room.localParticipant;
-        if (!on) return lp.setCameraEnabled(false);
-        var id = await resolveCam();
-        try { return await lp.setCameraEnabled(true, id ? { deviceId: id } : undefined); }
-        catch (e) { if (id) return lp.setCameraEnabled(true); throw e; }
+        if (on && !force && self.camTrack && self.camTrack.mediaStreamTrack && self.camTrack.mediaStreamTrack.readyState === 'live') return null; // já está no ar
+        if (self.camTrack) {
+          var old = self.camTrack; self.camTrack = null;
+          try { await lp.unpublishTrack(old, true); } catch (e) { /* ignorar */ }
+          try { old.mediaStreamTrack.stop(); } catch (e) { /* ignorar */ }
+        }
+        if (!on) { releaseCamIfUnused(); return null; }
+        var stream = await acquireCam();
+        var src = stream.getVideoTracks()[0];
+        var lt = new LK.LocalVideoTrack(src.clone(), undefined, true);
+        await lp.publishTrack(lt, { source: LK.Track.Source.Camera, name: 'camera', simulcast: false, videoEncoding: { maxBitrate: 450000, maxFramerate: 24 } });
+        self.camTrack = lt;
+        return null;
       }).catch(function () {
-        if (on) { ui.camRoom = null; ui.warn = 'Não consegui usar a sua câmera. Libere a permissão do navegador (cadeado ao lado do endereço) e tente de novo.'; syncViews(); applyHear(); render(); }
+        if (on) {
+          ui.camRooms.clear(); ui.lobbyCam = false;
+          ui.warn = 'Não consegui usar a sua câmera. Libere a permissão do navegador (cadeado ao lado do endereço) e tente de novo.';
+          syncViews(); applyHear(); render();
+        }
       });
     }
     setShare(stream) {
@@ -387,6 +450,7 @@
     }
     destroy() {
       this.dead = true;
+      setTimeout(releaseCamIfUnused, 0);
       clearTimeout(this.rt);
       try { if (this.room) this.room.disconnect(); } catch (e) { /* ignorar */ }
       this.audioEls.forEach(function (el) { el.remove(); });
@@ -405,8 +469,9 @@
     // Só conecta nas salas que você está vendo ou ouvindo: sem conexão, sem consumo de minutos.
     var bm = new Set(S.bmic || []);
     if (live) S.rooms.forEach(function (r) {
-      if (r.lk && (ui.watch.has(r.id) || (S.hear && S.hear.roomId === r.id) || bm.has(r.id) || (ui.share && ui.share.rooms.has(r.id)) || ui.camRoom === r.id)) want.set(r.id, r);
+      if (r.lk && (ui.watch.has(r.id) || (S.hear && S.hear.roomId === r.id) || bm.has(r.id) || (ui.share && ui.share.rooms.has(r.id)) || ui.camRooms.has(r.id))) want.set(r.id, r);
     });
+    if (ui.lobbyOn && S.lobby && S.phase !== 'done') want.set('lobby', { id: 'lobby', lk: S.lobby });
     views.forEach(function (v, id) {
       var r = want.get(id);
       if (!r || r.lk.room !== v.name) { v.destroy(); views.delete(id); }
@@ -417,13 +482,20 @@
     var h = S && S.hear;
     var bm = new Set((S && S.bmic) || []);
     views.forEach(function (v, id) {
+      if (id === 'lobby') {
+        if (v.watching !== ui.lobbyWatch) v.setWatching(ui.lobbyWatch);
+        if (v.listening !== ui.lobbyListen) v.setListening(ui.lobbyListen);
+        if (v.talking !== ui.lobbyTalk) v.setTalking(ui.lobbyTalk);
+        if (v.camOn !== ui.lobbyCam) v.setCam(ui.lobbyCam);
+        return;
+      }
       var w = ui.watch.has(id);
       if (v.watching !== w) v.setWatching(w);
       var l = !!h && h.roomId === id;
       if (v.listening !== l) v.setListening(l);
       var t = (l && h.mode === 'talk') || bm.has(id);
       if (v.talking !== t) v.setTalking(t);
-      var cm = ui.camRoom === id;
+      var cm = ui.camRooms.has(id);
       if (v.camOn !== cm) v.setCam(cm);
       var sh = ui.share && ui.share.rooms.has(id) ? ui.share.stream : null;
       if (v.shareStream !== sh) v.setShare(sh);
@@ -438,7 +510,7 @@
     ui.warn = '';
     return T('POST', '/api/professor/classes/' + classId + '/act', body).catch(function (e) {
       ui.warn = e.message;
-      return T('GET', '/api/professor/classes/' + classId).then(function (d) { S = d; offset = S.now - Date.now(); onState(); }, function () { render(); });
+      return T('GET', '/api/professor/classes/' + classId + '?tid=' + tid).then(function (d) { S = d; offset = S.now - Date.now(); onState(); }, function () { render(); });
     });
   }
   function moveLocal(pid, roomId) {
@@ -464,7 +536,7 @@
   }
 
   // ---------- desenho ----------
-  var PHASE_LABEL = { lobby: 'Sala de espera', r1: 'Rodada 1 de 2', between: 'Intervalo', r2: 'Rodada 2 de 2', done: 'Aula encerrada' };
+  var PHASE_LABEL = { lobby: 'Sala de espera', r1: 'Rodada 1 de 2', between: 'Intervalo', r2: 'Rodada 2 de 2', closing: 'Encerramento', done: 'Aula encerrada' };
   function isLive() { return S.phase === 'r1' || S.phase === 'r2'; }
   function isPlanning() { return S.phase === 'lobby' || S.phase === 'between'; }
 
@@ -519,13 +591,13 @@
       else if (listening) status = '<span class="tag hear"><span class="eq"><i></i><i></i><i></i></span>Ouvindo a sala</span>';
       else status = '<span>Sem áudio</span>';
       if (sharing) status += '<span class="tag share">' + A.ICON.screen + 'Tela compartilhada</span>';
-      if (ui.camRoom === r.id) status += '<span class="tag live">' + A.ICON.cam + 'Você está na câmera</span>';
+      if (ui.camRooms.has(r.id)) status += '<span class="tag live">' + A.ICON.cam + 'Você está na câmera</span>';
       var un = ui.unread[r.id] || 0;
       actions = '<div class="room-actions">' +
         '<button class="btn wide" data-act="watch" data-room="' + r.id + '" aria-pressed="' + ui.watch.has(r.id) + '" type="button">' + A.ICON.cam + (ui.watch.has(r.id) ? 'Parar de ver vídeo' : 'Ver vídeo') + '</button>' +
         '<button class="btn" data-act="listen" data-room="' + r.id + '" aria-pressed="' + listening + '" type="button">' + A.ICON.head + 'Ouvir</button>' +
         '<button class="btn btn-live" data-act="talk" data-room="' + r.id + '" aria-pressed="' + talking + '" type="button">' + A.ICON.mic + (talking ? 'Falando' : 'Falar') + '</button>' +
-        '<button class="btn wide" data-act="cam" data-room="' + r.id + '" aria-pressed="' + (ui.camRoom === r.id) + '" type="button">' + A.ICON.cam + (ui.camRoom === r.id ? 'Sair da câmera desta sala' : 'Aparecer na câmera') + '</button>' +
+        '<button class="btn wide" data-act="cam" data-room="' + r.id + '" aria-pressed="' + ui.camRooms.has(r.id) + '" type="button">' + A.ICON.cam + (ui.camRooms.has(r.id) ? 'Sair da câmera desta sala' : 'Aparecer na câmera') + '</button>' +
         '<button class="btn wide" data-act="chat-open" data-room="' + r.id + '" aria-pressed="' + (ui.chatRoom === r.id) + '" type="button">' + A.ICON.chat + 'Chat' + (un ? ' <span class="unread">' + un + '</span>' : '') + '</button></div>';
     } else if (!members.length) {
       actions = '<div class="room-actions"><button class="btn btn-sm wide" data-act="remove-room" data-room="' + r.id + '" type="button">Remover sala vazia</button></div>';
@@ -535,14 +607,51 @@
       body + (status ? '<div class="room-status">' + status + '</div>' : '') + actions + '</article>';
   }
 
+  // ---------- sala de espera (aluno sem sala) ----------
+  function lobbyPeople() {
+    var assigned = new Set();
+    if (isLive()) S.rooms.forEach(function (r) { r.members.forEach(function (p) { assigned.add(p); }); });
+    return S.students.filter(function (s) { return s.online && !assigned.has(s.pid); });
+  }
+  function lobbyTileHTML(s) {
+    return '<div class="tile ' + A.LEVEL_CLS[s.level] + '" data-pid="' + s.pid + '" data-room="lobby">' +
+      '<span class="avatar">' + esc(A.initials(s.name)) + '</span>' +
+      '<span class="slot" data-room="lobby" data-pid="' + s.pid + '"></span>' +
+      '<span class="nm" title="' + esc(s.name) + '">' + esc(s.name) + '</span>' +
+      '<span class="micoff">' + A.ICON.micoff + '</span></div>';
+  }
+  function lobbyHTML() {
+    var people = lobbyPeople();
+    var un = ui.unread.lobby || 0;
+    var chatBtn = '<button class="btn wide" data-act="chat-open" data-room="lobby" aria-pressed="' + (ui.chatRoom === 'lobby') + '" type="button">' + A.ICON.chat + 'Chat da sala de espera' + (un ? ' <span class="unread">' + un + '</span>' : '') + '</button>';
+    var h = '<section class="lobbycard' + (ui.lobbyOn ? ' on' : '') + '"><div class="room-head"><h3>Sala de espera</h3><span class="badge">' + people.length + ' online</span></div>';
+    if (!ui.lobbyOn) {
+      h += '<p class="hint">Entre na sala de espera para ver, ouvir e falar com os alunos que estão esperando. Enquanto você estiver conectado, os minutos do LiveKit são consumidos. O chat funciona sem entrar.</p>' +
+        '<div class="room-actions"><button class="btn btn-primary wide" data-act="lobby-join" type="button">Entrar na sala de espera</button>' + chatBtn + '</div></section>';
+      return h;
+    }
+    h += (people.length ? '<div class="tiles lobby-tiles">' + people.map(lobbyTileHTML).join('') + '</div>' : '<p class="empty">Ninguém na sala de espera agora.</p>');
+    var status = ui.lobbyTalk ? '<span class="tag live"><i class="pulse"></i>Seu microfone está aberto para a sala de espera</span>'
+      : (ui.lobbyListen ? '<span class="tag hear"><span class="eq"><i></i><i></i><i></i></span>Ouvindo a sala de espera</span>' : '<span>Sem áudio</span>');
+    if (ui.lobbyCam) status += '<span class="tag live">' + A.ICON.cam + 'Você está na câmera</span>';
+    h += '<div class="room-status">' + status + '</div><div class="room-actions">' +
+      '<button class="btn" data-act="lobby-watch" aria-pressed="' + ui.lobbyWatch + '" type="button">' + A.ICON.cam + (ui.lobbyWatch ? 'Parar de ver vídeo' : 'Ver vídeo') + '</button>' +
+      '<button class="btn" data-act="lobby-listen" aria-pressed="' + ui.lobbyListen + '" type="button">' + A.ICON.head + (ui.lobbyListen ? 'Ouvindo' : 'Ouvir') + '</button>' +
+      '<button class="btn btn-live" data-act="lobby-talk" aria-pressed="' + ui.lobbyTalk + '" type="button">' + A.ICON.mic + (ui.lobbyTalk ? 'Falando' : 'Falar') + '</button>' +
+      '<button class="btn" data-act="lobby-cam" aria-pressed="' + ui.lobbyCam + '" type="button">' + A.ICON.cam + (ui.lobbyCam ? 'Sair da câmera' : 'Aparecer na câmera') + '</button>' +
+      chatBtn +
+      '<button class="btn wide" data-act="lobby-leave" type="button">Sair da sala de espera</button></div></section>';
+    return h;
+  }
+
   function confirmText() {
     if (ui.confirm === 'start') {
       var n = S.students.length;
       if (S.phase === 'between') return 'Iniciar a rodada 2 com as salas abaixo? Cada aluno será levado para a nova sala.';
       return 'Ao iniciar, a aula é trancada e nenhum aluno novo poderá entrar. Iniciar agora com ' + n + ' aluno' + (n === 1 ? '' : 's') + '?';
     }
-    if (ui.confirm === 'end-round') return S.phase === 'r2' ? 'Encerrar a rodada 2 e terminar a aula?' : 'Encerrar a rodada 1 agora? Todos voltam para a sala de espera.';
-    if (ui.confirm === 'end-class') return 'Encerrar a aula agora? Todos os alunos serão desconectados.';
+    if (ui.confirm === 'end-round') return S.phase === 'r2' ? 'Encerrar a rodada 2? Todos voltam para a sala de espera e a aula termina sozinha em ' + (S.closingMinutes || 5) + ' minutos (você pode encerrar antes).' : 'Encerrar a rodada 1 agora? Todos voltam para a sala de espera.';
+    if (ui.confirm === 'end-class') return 'Encerrar a aula agora? Todos os alunos verão a mensagem final e serão desconectados.';
     return '';
   }
 
@@ -578,9 +687,9 @@
     var counts = { basico: 0, intermediario: 0 };
     S.students.forEach(function (s) { counts[s.level]++; });
 
-    var main = { lobby: ['Iniciar aula', 'start'], between: ['Iniciar rodada 2', 'start'], r1: ['Encerrar rodada 1', 'end-round'], r2: ['Encerrar rodada 2', 'end-round'] }[S.phase];
+    var main = { lobby: ['Iniciar aula', 'start'], between: ['Iniciar rodada 2', 'start'], r1: ['Encerrar rodada 1', 'end-round'], r2: ['Encerrar rodada 2', 'end-round'], closing: ['Encerrar a aula', 'end-class'] }[S.phase];
     var h = '<header class="topbar"><div><p class="small"><a href="/professor">&larr; Aulas</a></p><h1>' + esc(S.title) + '</h1>' +
-      '<div class="linkrow" style="margin-top:8px"><input class="input" readonly value="' + esc(url) + '" aria-label="Link da aula para os alunos"><button class="btn btn-sm" data-act="copy-link" data-url="' + esc(url) + '" type="button">' + A.ICON.link + 'Copiar link</button></div>' + temasHTML() + '</div>' +
+      '<div class="linkrow" style="margin-top:8px"><input class="input" readonly value="' + esc(url) + '" aria-label="Link da aula para os alunos"><button class="btn btn-sm" data-act="copy-link" data-url="' + esc(url) + '" type="button">' + A.ICON.link + 'Copiar link</button><a class="btn btn-sm" href="/relatorio/' + S.id + '" target="_blank" rel="noopener">Relatório</a></div>' + temasHTML() + '</div>' +
       '<div class="clock"><div><div class="phase">' + PHASE_LABEL[S.phase] + '</div><div class="timer idle" id="p-timer">' + A.mmss(S.roundMinutes * 60) + '</div><div class="bar" aria-hidden="true"><i id="p-bar"></i></div></div>' +
       (main ? '<button class="btn btn-primary" data-act="main" type="button">' + main[0] + '</button>' : '') + '</div></header>';
 
@@ -617,6 +726,14 @@
       }
     }
 
+    if (S.phase === 'closing') {
+      h += '<div class="card"><h2>Encerramento</h2><p>Todos os alunos voltaram para a sala de espera. A aula termina sozinha quando a contagem chegar a zero, ou antes, se você clicar em “Encerrar a aula”. Aproveite para falar com todos e se despedir.</p></div>' +
+        lobbyHTML(by) + '<div id="set-slot"></div><div id="em-slot"></div>';
+      app.innerHTML = h;
+      postRender();
+      return;
+    }
+
     h += '<div class="toolbar">';
     if (planning) {
       h += '<span class="lbl-t" style="margin:0">Salas</span><span class="stepper"><button class="btn btn-sm" data-act="n-minus" type="button" aria-label="Menos salas">&minus;</button><output>' + (ui.n || 'auto') + '</output><button class="btn btn-sm" data-act="n-plus" type="button" aria-label="Mais salas">+</button></span>' +
@@ -632,6 +749,7 @@
       h += '<p class="hint">As salas começam só com as iniciais. “Ver vídeo” mostra o vídeo da sala escolhida (e passa a consumir dados do LiveKit só dela). “Ouvir” liga o áudio só da sala escolhida. “Falar” abre o seu microfone só para ela. Use fones de ouvido para evitar eco.</p>';
     }
 
+    if (!live || unassigned.some(function (u) { return u.online; })) h += lobbyHTML(by);
     h += '<div id="set-slot"></div>';
     if (live) h += '<div id="bc-slot"></div>';
     h += '<div class="board">';
@@ -683,7 +801,7 @@
     setEl.addEventListener('toggle', function () { if (setEl.open) startPrev(); else stopPrev(); });
     setEl.querySelector('#set-cam').addEventListener('change', function () {
       var p = loadDev(); p.cam = this.value; saveDev(p);
-      views.forEach(function (v) { if (v.camOn && v.connected) v.room.switchActiveDevice('videoinput', p.cam).catch(function () { /* ignorar */ }); });
+      restartCam();
       startPrev();
     });
     setEl.querySelector('#set-mic').addEventListener('change', function () {
@@ -765,7 +883,11 @@
     h += '</div><div class="bc-group"><span class="lbl-t">Tela</span>';
     if (sh) h += '<button class="btn btn-live" aria-pressed="true" data-act="share-stop" type="button">' + A.ICON.screen + 'Parar (' + sh + ' sala' + (sh === 1 ? '' : 's') + ')</button>';
     else h += '<button class="btn" data-act="share-all" type="button">' + A.ICON.screen + 'Todas as salas</button><button class="btn"' + (n ? '' : ' disabled') + ' data-act="share-sel" type="button">' + A.ICON.screen + 'Selecionadas</button>';
-    h += '</div></div><p class="hint">Marque as salas pela caixinha no topo de cada uma. Falar e compartilhar a tela conectam você às salas escolhidas e consomem minutos do LiveKit enquanto estiver ligado. Para a tela, quanto mais salas, mais internet de envio é preciso.</p>';
+    var cm = ui.camRooms.size;
+    h += '</div><div class="bc-group"><span class="lbl-t">Câmera</span>';
+    if (cm) h += '<button class="btn btn-live" aria-pressed="true" data-act="cam-off" type="button">' + A.ICON.cam + 'Desligar (' + cm + ' sala' + (cm === 1 ? '' : 's') + ')</button>';
+    else h += '<button class="btn" data-act="cam-all" type="button">' + A.ICON.cam + 'Todas as salas</button><button class="btn"' + (n ? '' : ' disabled') + ' data-act="cam-sel" type="button">' + A.ICON.cam + 'Selecionadas</button>';
+    h += '</div></div><p class="hint">Marque as salas pela caixinha no topo de cada uma. Falar, câmera e tela conectam você às salas escolhidas e consomem minutos do LiveKit enquanto estiverem ligados. Para tela e câmera, quanto mais salas, mais internet de envio é preciso.</p>';
     bcEl.querySelector('#bc-top').innerHTML = h;
     bcEl.querySelector('#bc-send-sel').disabled = !n;
   }
@@ -816,7 +938,7 @@
     ensureDock();
     var total = 0;
     Object.keys(ui.unread).forEach(function (id) { total += ui.unread[id] || 0; });
-    var show = !!S && isLive() && !ui.chatRoom && total > 0;
+    var show = !!S && S.phase !== 'done' && !ui.chatRoom && total > 0;
     pillEl.hidden = !show;
     if (show) pillEl.textContent = 'Chat · ' + total + (total === 1 ? ' mensagem nova' : ' mensagens novas');
   }
@@ -856,11 +978,11 @@
   function renderDock(stick) {
     ensureDock();
     renderPill();
-    if (!ui.chatRoom || !S || !isLive()) { dockEl.hidden = true; return; }
-    var r = S.rooms.find(function (x) { return x.id === ui.chatRoom; });
-    if (!r) { dockEl.hidden = true; ui.chatRoom = null; return; }
+    if (!ui.chatRoom || !S || S.phase === 'done') { dockEl.hidden = true; return; }
+    var r = ui.chatRoom === 'lobby' ? { no: 'de espera' } : S.rooms.find(function (x) { return x.id === ui.chatRoom; });
+    if (!r || (ui.chatRoom !== 'lobby' && !isLive())) { dockEl.hidden = true; ui.chatRoom = null; return; }
     dockEl.hidden = false;
-    $('dock-title').textContent = 'Chat · Sala ' + r.no;
+    $('dock-title').textContent = ui.chatRoom === 'lobby' ? 'Chat · Sala de espera' : 'Chat · Sala ' + r.no;
     var list = ui.chat[ui.chatRoom] || [];
     var el = $('dock-list');
     var near = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
@@ -875,7 +997,7 @@
     else if (m.from !== 'professor') { ui.unread[roomId] = (ui.unread[roomId] || 0) + 1; if (S) render(); renderPill(); }
   }
   function fetchChat() {
-    if (!S || !isLive()) return;
+    if (!S) return;
     var round = S.round;
     T('GET', '/api/professor/classes/' + classId + '/chat').then(function (r) {
       if (S.round !== round) return;
@@ -925,18 +1047,26 @@
     if (!S) return;
     var t = $('p-timer');
     var bar = $('p-bar');
-    if (t && S.endsAt && isLive()) {
+    var counting = isLive() || S.phase === 'closing';
+    if (S.endsAt && counting) {
       var left = (S.endsAt - (Date.now() + offset)) / 1000;
-      t.textContent = A.mmss(left);
-      t.className = 'timer' + (left <= 60 ? ' warn' : '');
-      if (bar) bar.style.width = Math.min(100, Math.max(0, 100 * (1 - left / (S.roundMinutes * 60)))) + '%';
-    } else if (t) {
-      t.className = 'timer idle';
-      if (bar) bar.style.width = S.phase === 'done' ? '100%' : '0';
+      var total = (isLive() ? S.roundMinutes : (S.closingMinutes || 5)) * 60;
+      if (t) {
+        t.textContent = A.mmss(left);
+        t.className = 'timer' + (left <= 60 ? ' warn' : '');
+      }
+      if (bar) bar.style.width = Math.min(100, Math.max(0, 100 * (1 - left / total))) + '%';
+      A.urgent(A.urgentText(left, isLive() ? 'para o fim da rodada' : 'para a aula encerrar'));
+    } else {
+      A.urgent(null);
+      if (t) {
+        t.className = 'timer idle';
+        if (bar) bar.style.width = S.phase === 'done' ? '100%' : '0';
+      }
     }
     document.querySelectorAll('[data-since]').forEach(function (el) {
-      var s = Math.max(0, Math.floor((Date.now() + offset - Number(el.getAttribute('data-since'))) / 1000));
-      el.textContent = 'há ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+      var sec = Math.max(0, Math.floor((Date.now() + offset - Number(el.getAttribute('data-since'))) / 1000));
+      el.textContent = 'há ' + Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
     });
   }
   setInterval(tick, 500);
@@ -957,7 +1087,7 @@
       return;
     }
     if (!S) return;
-    if (a === 'main') { ui.confirm = isPlanning() ? 'start' : 'end-round'; render(); return; }
+    if (a === 'main') { ui.confirm = isPlanning() ? 'start' : (S.phase === 'closing' ? 'end-class' : 'end-round'); render(); return; }
     if (a === 'allow-late') { act({ action: 'allow-late', on: !S.allowLate }); return; }
     if (a === 'ask-end-class') { ui.confirm = 'end-class'; render(); return; }
     if (a === 'confirm-no') { ui.confirm = null; render(); return; }
@@ -991,13 +1121,22 @@
     if (a === 'chat-close') { ui.chatRoom = null; renderDock(false); render(); return; }
     if (a === 'em-save') { saveEm(false); return; }
     if (a === 'em-reset') { saveEm(true); return; }
+    if (a === 'lobby-join') { ui.lobbyOn = true; ui.lobbyListen = true; startAudioAll(); syncViews(); applyHear(); render(); return; }
+    if (a === 'lobby-leave') { ui.lobbyOn = false; ui.lobbyWatch = false; ui.lobbyTalk = false; ui.lobbyCam = false; syncViews(); applyHear(); render(); return; }
+    if (a === 'lobby-watch') { ui.lobbyWatch = !ui.lobbyWatch; applyHear(); render(); return; }
+    if (a === 'lobby-listen') { ui.lobbyListen = !ui.lobbyListen; startAudioAll(); applyHear(); render(); return; }
+    if (a === 'lobby-talk') { ui.lobbyTalk = !ui.lobbyTalk; startAudioAll(); applyHear(); render(); return; }
+    if (a === 'lobby-cam') { ui.lobbyCam = !ui.lobbyCam; applyHear(); render(); return; }
+    if (a === 'cam-all') { S.rooms.forEach(function (r) { ui.camRooms.add(r.id); }); syncViews(); applyHear(); render(); return; }
+    if (a === 'cam-sel') { selectedIds().forEach(function (id) { ui.camRooms.add(id); }); syncViews(); applyHear(); render(); return; }
+    if (a === 'cam-off') { ui.camRooms.clear(); applyHear(); syncViews(); render(); return; }
     if (a === 'watch') {
       if (ui.watch.has(room)) ui.watch.delete(room); else ui.watch.add(room);
       syncViews(); applyHear(); render();
       return;
     }
     if (a === 'cam') {
-      ui.camRoom = ui.camRoom === room ? null : room;   // só uma sala por vez
+      if (ui.camRooms.has(room)) ui.camRooms.delete(room); else ui.camRooms.add(room);
       syncViews(); applyHear(); render();
       return;
     }
@@ -1014,7 +1153,7 @@
     if (a === 'answer') {
       startAudioAll();
       S.students.forEach(function (s) { var r = S.rooms.find(function (x) { return x.id === room; }); if (r && r.members.indexOf(s.pid) !== -1) s.callAt = null; });
-      ui.camRoom = room;                       // ao atender, o professor também aparece na câmera da sala
+      ui.camRooms.add(room);                   // ao atender, o professor também aparece na câmera da sala
       setHear({ roomId: room, mode: 'talk' });
       act({ action: 'answer', roomId: room });
     }

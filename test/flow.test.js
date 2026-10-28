@@ -72,7 +72,7 @@ test('aula completa com 28 alunos', async function (t) {
 
   // --- professor conecta ---
   let teacher = null;
-  const tws = new WebSocket('ws://127.0.0.1:' + port + '/ws?role=teacher&class=' + CID + '&token=' + encodeURIComponent(T));
+  const tws = new WebSocket('ws://127.0.0.1:' + port + '/ws?role=teacher&class=' + CID + '&token=' + encodeURIComponent(T) + '&tid=abc123');
   tws.on('message', (m) => { const j = JSON.parse(m); if (j.type === 'state') teacher = j.data; });
   await until(() => teacher);
 
@@ -168,7 +168,7 @@ test('aula completa com 28 alunos', async function (t) {
   assert.notStrictEqual(otherRoomStudent.state.room.lk.room, students[0].state.room.lk.room, 'salas diferentes, salas LiveKit diferentes');
   for (const r of teacher.rooms) {
     const j = decodeJwt(r.lk.token);
-    assert.strictEqual(j.payload.sub, 'professor');
+    assert.strictEqual(j.payload.sub, 'prof-abc123', 'cada professor tem identidade própria');
     assert.strictEqual(j.payload.video.room, r.lk.room);
   }
 
@@ -227,6 +227,10 @@ test('aula completa com 28 alunos', async function (t) {
   await until(() => teacher.phase === 'r2' && students.every((s) => s.state.phase === 'r2' && s.state.room));
   assert.ok(decodeJwt(students[0].state.room.lk.token).payload.video.room.includes('-r2-'), 'sala LiveKit da rodada 2');
   await act({ action: 'end-round' });
+  await until(() => teacher.phase === 'closing' && students.every((s) => s.state.phase === 'closing' && !s.state.room && s.state.lobby));
+  assert.ok(teacher.endsAt > Date.now(), 'contagem de 5 minutos');
+  assert.ok(teacher.lobby && teacher.lobby.token, 'professor recebe a sala de espera');
+  await act({ action: 'end-class' });
   await until(() => teacher.phase === 'done' && students.every((s) => s.state.phase === 'done'));
   assert.strictEqual((await api('POST', '/api/classes/' + CID + '/join', { name: 'Tarde demais', level: 'basico' })).json.error, 'done');
 

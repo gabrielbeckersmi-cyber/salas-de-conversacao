@@ -19,3 +19,5 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false

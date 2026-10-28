@@ -143,3 +143,13 @@ button, input, select { font: inherit; }
   .pulse, .eq i { animation: none; }
   .tile { transition: none; }
 }
+
+/* alerta dos últimos 30 segundos */
+.urgent-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 400; background: var(--live); color: var(--on-live); text-align: center; font-family: var(--font-display); font-weight: 700; font-size: clamp(18px, 3.4vw, 28px); padding: 10px 56px; padding-top: max(10px, env(safe-area-inset-top)); letter-spacing: 0.01em; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3); animation: urgentbar 1s steps(2, jump-none) infinite; pointer-events: none; }
+.urgent-banner[hidden] { display: none; }
+body.urgent::after { content: ''; position: fixed; inset: 0; z-index: 399; pointer-events: none; border: 8px solid var(--live); animation: urgentedge 1s ease-in-out infinite; }
+body.urgent .timer, body.urgent .clock .timer { color: var(--live); animation: urgenttimer 1s ease-in-out infinite; }
+@keyframes urgentbar { 0% { background: var(--live); } 100% { background: #7d120c; } }
+@keyframes urgentedge { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes urgenttimer { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .urgent-banner, body.urgent::after, body.urgent .timer { animation: none; } }

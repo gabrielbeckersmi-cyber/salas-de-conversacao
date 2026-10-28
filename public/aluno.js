@@ -29,6 +29,19 @@
   var snap = null;
   var offset = 0;
   var conn = null;
+  function isProf(id) { return /^prof-/.test(String(id)); }
+  // avisa o servidor de problemas de conexão de vídeo (entram no relatório da aula)
+  function reportProblem(kind) {
+    if (!session) return;
+    A.api('POST', '/api/classes/' + encodeURIComponent(classId) + '/problem', { studentId: session.studentId, kind: kind }).catch(function () { /* ignorar */ });
+  }
+  function watchHealth(room, current) {
+    var E = LK.RoomEvent;
+    room.on(E.ConnectionStateChanged, function (st) { if (current() && (st === 'reconnecting' || st === 'signalReconnecting')) reportProblem('video-reconectando'); });
+    room.on(E.ConnectionQualityChanged, function (q, p) {
+      if (current() && p && p === room.localParticipant && (q === 'poor' || q === 'lost')) reportProblem('qualidade-ruim');
+    });
+  }
 
   // ---------- telas simples ----------
   // botão "Sair da aula": fica fixo no topo, ao lado do botão de tema
@@ -41,6 +54,7 @@
   A.topctl().insertBefore(leaveBtn, A.topctl().firstChild);
   function showOnly(which) {
     document.body.classList.toggle('in-live', which === 'live');
+    if (which === 'screen') A.urgent(null);
     leaveBtn.hidden = which === 'screen';
     screenEl.hidden = which !== 'screen';
     waitingEl.hidden = which !== 'waiting';
@@ -68,7 +82,7 @@
     if (conn) { conn.close(); conn = null; }
     sendLeave();
     resetTutorial();
-    leaveLive(); stopCheck(); window.Jogo.stop();
+    leaveLive(); leaveLobby(); stopCheck(); window.Jogo.stop();
     snap = null;
     say('<div class="card join"><h1>Você saiu da aula</h1><p>Quando quiser, volte para a aula. Você entra na mesma sala em que estava.</p>' +
       '<button class="btn btn-primary" id="j-back" type="button">Voltar para a aula</button></div>');
@@ -140,13 +154,13 @@
         if (e.code === 4003) { // sessão não existe mais no servidor
           session = null;
           try { localStorage.removeItem(KEY); } catch (e2) { /* ignorar */ }
-          leaveLive(); stopCheck();
+          leaveLive(); leaveLobby(); stopCheck();
           screenJoin('Não encontramos sua entrada nesta aula. Entre novamente com o mesmo nome.');
         } else if (e.code === 4004) {
-          leaveLive(); stopCheck();
+          leaveLive(); leaveLobby(); stopCheck();
           screenMessage('Aula não encontrada', 'Confira o link que o professor enviou.');
         } else if (e.code === 4002) {
-          leaveLive(); stopCheck();
+          leaveLive(); leaveLobby(); stopCheck();
           screenMessage('Você foi removido da aula', 'Fale com o professor se isso foi um engano.');
         } else if (snap) {
           // só avisa se a queda durar mais de 3 segundos (oscilações curtas são normais)
@@ -163,7 +177,8 @@
       offset = snap.now - Date.now();
       render();
     } else if (m.type === 'chat') {
-      if (snap && snap.room && m.roomId === snap.room.id) addChat(m.msg);
+      if (m.roomId === 'lobby') addLobbyChat(m.msg);
+      else if (snap && snap.room && m.roomId === snap.room.id) addChat(m.msg);
     }
   }
 
@@ -171,6 +186,8 @@
   var chat = { roomId: null, list: [], ids: new Set() };
   var chatOpen = true;
   var chatUnread = 0;
+  var chatTab = 'chat';       // 'chat' | 'tr'
+  var trSeen = false;         // o aluno já abriu o tradutor nesta rodada?
   var chatListEl = $('l-chat-list');
   function chatNearBottom() { return chatListEl.scrollHeight - chatListEl.scrollTop - chatListEl.clientHeight < 60; }
   function chatHTML(m) {
@@ -186,21 +203,39 @@
     var b = $('l-chat-toggle');
     $('l-chat-body').hidden = !chatOpen;
     b.setAttribute('aria-expanded', String(chatOpen));
-    b.textContent = chatOpen ? 'Esconder chat' : (chatUnread ? 'Mostrar chat · ' + chatUnread + (chatUnread === 1 ? ' nova' : ' novas') : 'Mostrar chat');
-    $('l-chat').classList.toggle('chat-new', !chatOpen && chatUnread > 0);
+    b.textContent = chatOpen ? 'Esconder' : (chatUnread ? 'Mostrar · ' + chatUnread + (chatUnread === 1 ? ' nova' : ' novas') : 'Mostrar');
+    $('l-chat').classList.toggle('chat-new', chatUnread > 0 && (!chatOpen || chatTab !== 'chat'));
+    $('tab-chat').classList.toggle('on', chatTab === 'chat');
+    $('tab-tr').classList.toggle('on', chatTab === 'tr');
+    $('tab-chat').setAttribute('aria-selected', String(chatTab === 'chat'));
+    $('tab-tr').setAttribute('aria-selected', String(chatTab === 'tr'));
+    $('tab-tr').classList.toggle('nudge', !trSeen);
+    $('pane-chat').hidden = chatTab !== 'chat';
+    $('pane-tr').hidden = chatTab !== 'tr';
   }
   $('l-chat-toggle').addEventListener('click', function () {
     chatOpen = !chatOpen;
-    if (chatOpen) { chatUnread = 0; }
+    if (chatOpen && chatTab === 'chat') { chatUnread = 0; }
+    if (chatOpen && chatTab === 'tr') trSeen = true;
     paintChatToggle();
     if (chatOpen) chatListEl.scrollTop = chatListEl.scrollHeight;
   });
+  function setTab(t) {
+    chatTab = t;
+    chatOpen = true;
+    if (t === 'chat') chatUnread = 0; else trSeen = true;
+    paintChatToggle();
+    if (t === 'chat') chatListEl.scrollTop = chatListEl.scrollHeight;
+    else setTimeout(function () { try { $('tr-in').focus({ preventScroll: true }); } catch (e) { /* ignorar */ } }, 30);
+  }
+  $('tab-chat').addEventListener('click', function () { setTab('chat'); });
+  $('tab-tr').addEventListener('click', function () { setTab('tr'); });
   function addChat(m) {
     if (chat.ids.has(m.id)) return;
     chat.ids.add(m.id);
     chat.list.push(m);
     var mine = snap && m.pid === snap.me.pid;
-    if (!chatOpen && !mine) { chatUnread++; paintChatToggle(); }
+    if ((!chatOpen || chatTab !== 'chat') && !mine) { chatUnread++; paintChatToggle(); }
     var stick = chatNearBottom() || mine;
     renderChat(stick);
   }
@@ -210,6 +245,7 @@
     if (id === chat.roomId) return;
     chat = { roomId: id, list: [], ids: new Set() };
     chatUnread = 0;
+    trSeen = false;   // sala nova: o Tradutor volta a piscar para lembrar do recurso
     paintChatToggle();
     renderChat(true);
     if (!id || !session) return;
@@ -235,23 +271,25 @@
   });
 
   // ---------- câmera do professor (aparece como um quadro a mais na sala) ----------
-  function showTeacherCam(track) {
-    var t = tiles.get('professor');
+  function showTeacherCam(track, id) {
+    var key = id || 'prof-x';
+    var t = tiles.get(key);
     if (!t) {
       var el = document.createElement('div');
       el.className = 'tile teacher has-video';
       el.innerHTML = '<span class="avatar">P</span><video autoplay playsinline></video><span class="nm">Professor</span>';
       t = { el: el, video: el.querySelector('video') };
-      tiles.set('professor', t);
+      tiles.set(key, t);
       tilesEl.prepend(el);
     }
     track.attach(t.video);
     t.el.classList.add('has-video');
     var p = t.video.play(); if (p && p.catch) p.catch(function () { /* ignorar */ });
   }
-  function hideTeacherCam() {
-    var t = tiles.get('professor');
-    if (t) { t.video.srcObject = null; t.el.remove(); tiles.delete('professor'); }
+  function hideTeacherCam(id) {
+    var key = id || 'prof-x';
+    var t = tiles.get(key);
+    if (t) { t.video.srcObject = null; t.el.remove(); tiles.delete(key); }
   }
 
   // ---------- tela compartilhada pelo professor ----------
@@ -279,13 +317,13 @@
     $('title').textContent = snap.title;
     var running = snap.phase === 'r1' || snap.phase === 'r2';
     if (snap.phase === 'done') {
-      leaveLive(); stopCheck(); window.Jogo.stop();
+      leaveLive(); leaveLobby(); stopCheck(); window.Jogo.stop();
       closeTutorial();
       screenEnd(snap.endMessage);
       return;
     }
     if (running && snap.room) {
-      stopCheck(); window.Jogo.stop();
+      stopCheck(); window.Jogo.stop(); leaveLobby();
       resetTutorial(); closeTutorial();
       showOnly('live');
       updateLive();
@@ -298,6 +336,8 @@
     updateWaiting(running);
     window.Jogo.start();
     renderRank();
+    connectLobby(snap.lobby, snap.lobbyError);
+    tickTimer();
   }
 
   // ---------- ranking do joguinho ----------
@@ -316,8 +356,13 @@
 
   // ---------- sala de espera ----------
   function updateWaiting(running) {
-    var lvl = A.LEVEL_NAME[snap.me.level];
-    if (running) {
+    $('w-count').hidden = snap.phase !== 'closing';
+    if (snap.phase === 'closing') {
+      $('w-phase').textContent = 'Encerramento';
+      $('w-head').textContent = 'Obrigado pelas conversas!';
+      $('w-sub').textContent = 'Todos voltaram para a sala de espera. Aproveite para se despedir e fale com o professor. A aula termina sozinha quando a contagem chegar a zero.';
+      $('w-note').textContent = '';
+    } else if (running) {
       $('w-phase').textContent = 'Rodada em andamento';
       $('w-head').textContent = 'Estamos colocando você em uma sala';
       $('w-sub').textContent = 'O professor vai encaixar você em uma sala em instantes. Mantenha esta página aberta.';
@@ -508,7 +553,7 @@
   }
   $('w-cam').addEventListener('change', function () { var p = loadPrefs(); p.cam = this.value; savePrefs(p); startCheck({ cam: p.cam, mic: p.mic, retried: true }); });
   $('w-mic').addEventListener('change', function () { var p = loadPrefs(); p.mic = this.value; savePrefs(p); startCheck({ cam: p.cam, mic: p.mic, retried: true }); });
-  $('w-test').addEventListener('click', function () { if (check) { stopCheck(); checkStatus('Teste desligado.', 'small'); } else startCheck(); });
+  $('w-test').addEventListener('click', function () { if (check) { stopCheck(); checkStatus('Teste desligado.', 'small'); } else { lobbyMediaOff(); startCheck(); } });
 
   // ---------- sala de vídeo ----------
   var live = null;          // { room, name }
@@ -546,7 +591,7 @@
   function syncTiles() {
     if (!snap || !snap.room) return;
     var want = new Set(snap.room.members.map(function (m) { return m.pid; }));
-    tiles.forEach(function (t, pid) { if (pid !== 'professor' && !want.has(pid)) { t.el.remove(); tiles.delete(pid); } });
+    tiles.forEach(function (t, pid) { if (!isProf(pid) && !want.has(pid)) { t.el.remove(); tiles.delete(pid); } });
     snap.room.members.forEach(function (m) { getTile(m.pid, m.name); });
   }
   function clearTiles() {
@@ -596,9 +641,9 @@
       if (seq !== connSeq) return;
       if (track.kind === 'audio') {
         audioBox.appendChild(track.attach());
-      } else if (track.kind === 'video' && p.identity === 'professor') {
+      } else if (track.kind === 'video' && isProf(p.identity)) {
         if (pub.source === LK.Track.Source.ScreenShare) showScreen(track);
-        else showTeacherCam(track);
+        else showTeacherCam(track, p.identity);
       } else if (track.kind === 'video') {
         var t = getTile(p.identity, p.name);
         track.attach(t.video);
@@ -608,8 +653,8 @@
     });
     room.on(E.TrackUnsubscribed, function (track, pub, p) {
       track.detach().forEach(function (el) { if (el.tagName === 'AUDIO') el.remove(); });
-      if (track.kind === 'video' && p.identity === 'professor') {
-        if (pub.source === LK.Track.Source.ScreenShare) hideScreen(); else hideTeacherCam();
+      if (track.kind === 'video' && isProf(p.identity)) {
+        if (pub.source === LK.Track.Source.ScreenShare) hideScreen(); else hideTeacherCam(p.identity);
         return;
       }
       var t = tiles.get(p.identity);
@@ -630,6 +675,7 @@
     room.on(E.Disconnected, function () {
       if (seq !== connSeq || !live || live.room !== room) return;
       live = null;
+      reportProblem('video-caiu');
       setWarn('Você foi desconectado da sala de vídeo. Reconectando…', false);
       retryTimer = setTimeout(function () { if (snap && snap.room && snap.room.lk) startLive(snap.room.lk); }, 2000);
     });
@@ -665,6 +711,7 @@
     });
     live = { room: room, name: lk.room };
     bindRoom(room, seq);
+    watchHealth(room, function () { return seq === connSeq && live && live.room === room; });
     setWarn(null);
     setStatus('Conectando à sala…');
     syncTiles();
@@ -676,6 +723,7 @@
     }, function () {
       if (seq !== connSeq) return;
       live = null;
+      reportProblem('video-falhou');
       setStatus('');
       setWarn('Não consegui entrar na sala de vídeo. Tentando de novo…', false);
       retryTimer = setTimeout(function () { if (snap && snap.room && snap.room.lk) startLive(snap.room.lk); }, 3000);
@@ -773,8 +821,17 @@
   }
 
   function tickTimer() {
-    if (!snap || !snap.endsAt || liveEl.hidden) return;
-    $('l-timer').textContent = A.mmss((snap.endsAt - (Date.now() + offset)) / 1000);
+    if (!snap || !snap.endsAt) { A.urgent(null); return; }
+    var left = (snap.endsAt - (Date.now() + offset)) / 1000;
+    if (!liveEl.hidden) {
+      $('l-timer').textContent = A.mmss(left);
+      A.urgent(A.urgentText(left, 'para o fim da rodada'));
+    } else if (!waitingEl.hidden && snap.phase === 'closing') {
+      $('w-count-time').textContent = A.mmss(left);
+      A.urgent(A.urgentText(left, 'para a aula encerrar'));
+    } else {
+      A.urgent(null);
+    }
   }
   setInterval(tickTimer, 500);
 
@@ -801,6 +858,316 @@
   $('l-sound').addEventListener('click', function () {
     if (live) live.room.startAudio().then(function () { $('l-sound').hidden = live.room.canPlaybackAudio; }, function () { /* ignorar */ });
   });
+
+  // ---------- sala de espera em vídeo (todos que estão sem sala se veem e conversam) ----------
+  var lobby = null;          // { room, name }
+  var lobbySeq = 0;
+  var lobbyRetry = null;
+  var lTiles = new Map();    // identity -> { el, video }
+  var lobbyTilesEl = $('lobby-tiles');
+  var lobbyAudio = $('lobby-audio');
+
+  function lobbyWarn(text) { var w = $('lb-warn'); w.hidden = !text; w.textContent = text || ''; }
+  function lobbyCount() { $('lobby-count').textContent = lTiles.size ? '· ' + lTiles.size + (lTiles.size === 1 ? ' pessoa' : ' pessoas') : ''; }
+  function lobbyTile(id, name) {
+    var t = lTiles.get(id);
+    if (t) return t;
+    var prof = isProf(id);
+    var me = !!snap && id === snap.me.pid;
+    var el = document.createElement('div');
+    el.className = 'tile ' + (prof ? 'teacher lv-misto' : (me ? 'me ' + A.LEVEL_CLS[snap.me.level] : 'lv-misto'));
+    var label = prof ? 'Professor' : (me ? (name || snap.me.name) + ' (você)' : (name || '?'));
+    el.innerHTML = '<span class="avatar">' + A.esc(prof ? 'P' : A.initials(name || '?')) + '</span><video autoplay playsinline' + (me ? ' muted' : '') + '></video>' +
+      '<span class="nm">' + A.esc(label) + '</span><span class="micoff">' + A.ICON.micoff + '</span>';
+    t = { el: el, video: el.querySelector('video') };
+    // sem câmera ligada: começa com o ícone de microfone cortado até o aluno falar
+    el.classList.add('mic-off');
+    lTiles.set(id, t);
+    lobbyTilesEl.appendChild(el);
+    lobbyCount();
+    return t;
+  }
+  function clearLobbyTiles() {
+    lTiles.forEach(function (t) { try { t.video.srcObject = null; } catch (e) { /* ignorar */ } t.el.remove(); });
+    lTiles.clear();
+    lobbyAudio.innerHTML = '';
+    lobbyCount();
+  }
+  function lobbyMute(pub, p, muted) {
+    var t = lTiles.get(p.identity);
+    if (!t) return;
+    if (pub.kind === 'video') t.el.classList.toggle('video-off', muted);
+    if (pub.kind === 'audio') t.el.classList.toggle('mic-off', muted);
+  }
+  function lobbyLocal(room) {
+    if (!snap) return;
+    var t = lobbyTile(snap.me.pid, snap.me.name);
+    var cam = room.localParticipant.getTrackPublication(LK.Track.Source.Camera);
+    if (cam && cam.track) { cam.track.attach(t.video); t.el.classList.add('has-video'); t.el.classList.toggle('video-off', cam.isMuted); }
+    else t.el.classList.remove('has-video');
+    var mic = room.localParticipant.getTrackPublication(LK.Track.Source.Microphone);
+    t.el.classList.toggle('mic-off', !mic || mic.isMuted);
+  }
+  function lobbyControls() {
+    var mic = $('lb-mic');
+    var cam = $('lb-cam');
+    var lp = lobby && lobby.room.localParticipant;
+    var micOn = !!lp && lp.isMicrophoneEnabled;
+    var camOn = !!lp && lp.isCameraEnabled;
+    mic.innerHTML = (micOn ? A.ICON.mic : A.ICON.micoff) + (micOn ? 'Microfone ligado' : 'Ligar microfone');
+    mic.className = 'btn' + (micOn ? ' btn-live' : '');
+    mic.setAttribute('aria-pressed', String(micOn));
+    cam.innerHTML = A.ICON.cam + (camOn ? 'Câmera ligada' : 'Ligar câmera');
+    cam.className = 'btn' + (camOn ? ' btn-live' : '');
+    cam.setAttribute('aria-pressed', String(camOn));
+    mic.disabled = cam.disabled = !lobby;
+  }
+  function bindLobby(room, seq) {
+    var E = LK.RoomEvent;
+    var cur = function () { return seq === lobbySeq; };
+    room.on(E.ParticipantConnected, function (p) { if (cur()) lobbyTile(p.identity, p.name); });
+    room.on(E.ParticipantDisconnected, function (p) {
+      var t = lTiles.get(p.identity);
+      if (t) { try { t.video.srcObject = null; } catch (e) { /* ignorar */ } t.el.remove(); lTiles.delete(p.identity); lobbyCount(); }
+    });
+    room.on(E.TrackSubscribed, function (track, pub, p) {
+      if (!cur()) return;
+      var t = lobbyTile(p.identity, p.name);
+      if (track.kind === 'audio') { lobbyAudio.appendChild(track.attach()); t.el.classList.toggle('mic-off', pub.isMuted); }
+      else if (track.kind === 'video') {
+        if (isProf(p.identity) && pub.source === LK.Track.Source.ScreenShare) return; // a tela do professor só aparece nas salas
+        track.attach(t.video); t.el.classList.add('has-video'); t.el.classList.toggle('video-off', pub.isMuted);
+      }
+    });
+    room.on(E.TrackUnsubscribed, function (track, pub, p) {
+      track.detach().forEach(function (el) { if (el.tagName === 'AUDIO') el.remove(); });
+      var t = lTiles.get(p.identity);
+      if (t && track.kind === 'video') t.el.classList.remove('has-video');
+      if (t && track.kind === 'audio') t.el.classList.add('mic-off');
+    });
+    room.on(E.TrackMuted, function (pub, p) { lobbyMute(pub, p, true); });
+    room.on(E.TrackUnmuted, function (pub, p) { lobbyMute(pub, p, false); });
+    room.on(E.ActiveSpeakersChanged, function (sp) {
+      var ids = new Set(sp.map(function (x) { return x.identity; }));
+      lTiles.forEach(function (t, id) { t.el.classList.toggle('speaking', ids.has(id)); });
+    });
+    room.on(E.AudioPlaybackStatusChanged, function () { $('lb-sound').hidden = room.canPlaybackAudio; });
+    room.on(E.LocalTrackPublished, function () { lobbyLocal(room); lobbyControls(); });
+    room.on(E.LocalTrackUnpublished, function () { lobbyLocal(room); lobbyControls(); });
+    room.on(E.Disconnected, function () {
+      if (!cur() || !lobby || lobby.room !== room) return;
+      lobby = null;
+      reportProblem('video-caiu');
+      lobbyControls();
+      lobbyRetry = setTimeout(function () { if (snap && snap.lobby && !waitingEl.hidden) startLobby(snap.lobby); }, 2500);
+    });
+  }
+  function connectLobby(lk, err) {
+    if (!lk) { if (err) { $('lobby').hidden = false; lobbyWarn('A sala de espera em vídeo não está disponível agora.'); } return; }
+    $('lobby').hidden = false;
+    if (lobby && lobby.name === lk.room) return;
+    startLobby(lk);
+  }
+  function startLobby(lk) {
+    var seq = ++lobbySeq;
+    clearTimeout(lobbyRetry);
+    if (lobby) { var old = lobby.room; lobby = null; try { old.disconnect(); } catch (e) { /* ignorar */ } }
+    clearLobbyTiles();
+    lobbyControls();
+    return bestDevices().then(function (d) {
+      if (seq !== lobbySeq) return;
+      var vdef = { resolution: { width: 480, height: 360, frameRate: 15 } };
+      if (d.cam) vdef.deviceId = d.cam;
+      var adef = {};
+      if (d.mic) adef.deviceId = d.mic;
+      var room = new LK.Room({
+        adaptiveStream: true,
+        dynacast: true,
+        videoCaptureDefaults: vdef,
+        audioCaptureDefaults: adef,
+        publishDefaults: { videoEncoding: { maxBitrate: 250000, maxFramerate: 15 } }
+      });
+      bindLobby(room, seq);
+      watchHealth(room, function () { return seq === lobbySeq; });
+      return room.connect(lk.url, lk.token).then(function () {
+        if (seq !== lobbySeq) { try { room.disconnect(); } catch (e) { /* ignorar */ } return; }
+        lobby = { room: room, name: lk.room };
+        lobbyWarn(null);
+        lobbyLocal(room);
+        room.remoteParticipants.forEach(function (p) { lobbyTile(p.identity, p.name); });
+        $('lb-sound').hidden = room.canPlaybackAudio;
+        lobbyControls();
+        loadLobbyChat();
+      }, function () {
+        if (seq !== lobbySeq) return;
+        reportProblem('video-falhou');
+        lobbyWarn('Não consegui entrar na conversa da sala de espera. Tentando de novo…');
+        lobbyRetry = setTimeout(function () { if (snap && snap.lobby && !waitingEl.hidden) startLobby(snap.lobby); }, 4000);
+      });
+    });
+  }
+  function leaveLobby() {
+    lobbySeq++;
+    clearTimeout(lobbyRetry);
+    if (lobby) { var r = lobby.room; lobby = null; try { r.disconnect(); } catch (e) { /* ignorar */ } }
+    clearLobbyTiles();
+    lobbyControls();
+    $('lobby').hidden = true;
+    lobbyWarn(null);
+  }
+  // câmera e microfone do teste e da sala de espera usam o mesmo aparelho: um desliga o outro
+  function lobbyMediaOff() {
+    if (!lobby) return;
+    var lp = lobby.room.localParticipant;
+    lp.setMicrophoneEnabled(false).catch(function () { /* ignorar */ });
+    lp.setCameraEnabled(false).catch(function () { /* ignorar */ });
+  }
+  $('lb-mic').addEventListener('click', function () {
+    if (!lobby) return;
+    var lp = lobby.room.localParticipant;
+    if (!lp.isMicrophoneEnabled) stopCheck();
+    lp.setMicrophoneEnabled(!lp.isMicrophoneEnabled).then(function () { lobbyLocal(lobby.room); lobbyControls(); lobby.room.startAudio().catch(function () { /* ignorar */ }); },
+      function () { lobbyWarn('Não consegui usar o microfone. Verifique a permissão do navegador (cadeado ao lado do endereço).'); });
+  });
+  $('lb-cam').addEventListener('click', function () {
+    if (!lobby) return;
+    var lp = lobby.room.localParticipant;
+    if (!lp.isCameraEnabled) stopCheck();
+    lp.setCameraEnabled(!lp.isCameraEnabled).then(function () { lobbyLocal(lobby.room); lobbyControls(); },
+      function () { lobbyWarn('Não consegui usar a câmera. Verifique a permissão do navegador (cadeado ao lado do endereço).'); });
+  });
+  $('lb-sound').addEventListener('click', function () {
+    if (lobby) lobby.room.startAudio().then(function () { $('lb-sound').hidden = lobby.room.canPlaybackAudio; }, function () { /* ignorar */ });
+  });
+
+  // chat da sala de espera
+  var lchat = { list: [], ids: new Set() };
+  var lchatEl = $('lb-chat-list');
+  function lchatRender(stick) {
+    lchatEl.innerHTML = lchat.list.length ? lchat.list.map(chatHTML).join('') : '<p class="none">Diga olá para quem está esperando.</p>';
+    if (stick) lchatEl.scrollTop = lchatEl.scrollHeight;
+  }
+  function addLobbyChat(m) {
+    if (lchat.ids.has(m.id)) return;
+    lchat.ids.add(m.id);
+    lchat.list.push(m);
+    var near = lchatEl.scrollHeight - lchatEl.scrollTop - lchatEl.clientHeight < 60;
+    lchatRender(near || (snap && m.pid === snap.me.pid));
+  }
+  function loadLobbyChat() {
+    if (!session) return;
+    A.api('GET', '/api/classes/' + encodeURIComponent(classId) + '/chat?studentId=' + encodeURIComponent(session.studentId)).then(function (r) {
+      (r.lobby || []).forEach(function (m) { if (!lchat.ids.has(m.id)) { lchat.ids.add(m.id); lchat.list.push(m); } });
+      lchat.list.sort(function (a, b) { return a.id - b.id; });
+      lchatRender(true);
+    }, function () { /* ignorar */ });
+  }
+  lchatRender(false);
+  lobbyControls();
+  $('lb-chat-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var inp = $('lb-chat-in');
+    var text = inp.value.trim();
+    if (!text || !session) return;
+    inp.value = '';
+    A.api('POST', '/api/classes/' + encodeURIComponent(classId) + '/chat', { studentId: session.studentId, text: text }).catch(function (ex) {
+      inp.value = text;
+      lobbyWarn(ex.message);
+      setTimeout(function () { lobbyWarn(null); }, 3000);
+    });
+  });
+
+  // ---------- tradutor (português <-> inglês) ----------
+  var trDir = 'pt-en';
+  var trTimer = 0;
+  function decodeHtml(t) { var d = document.createElement('textarea'); d.innerHTML = t; return d.value; }
+  function trGoogle(text, from, to) {
+    return fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + from + '&tl=' + to + '&dt=t&q=' + encodeURIComponent(text))
+      .then(function (r) { if (!r.ok) throw new Error('g' + r.status); return r.json(); })
+      .then(function (j) { var out = (j && j[0] || []).map(function (x) { return x && x[0] || ''; }).join(''); if (!out) throw new Error('vazio'); return out; });
+  }
+  function trMyMemory(text, from, to) {
+    return fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(text) + '&langpair=' + from + '|' + to)
+      .then(function (r) { if (!r.ok) throw new Error('m' + r.status); return r.json(); })
+      .then(function (j) {
+        var t = j && j.responseData && j.responseData.translatedText;
+        if (!t || /MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID/i.test(t)) throw new Error('mm');
+        return decodeHtml(t);
+      });
+  }
+  function translateText(text, from, to) {
+    return trGoogle(text, from, to).catch(function () { return trMyMemory(text, from, to); });
+  }
+  function trPaint() {
+    var pt = trDir === 'pt-en';
+    $('tr-from').textContent = pt ? 'Português' : 'Inglês';
+    $('tr-to').textContent = pt ? 'Inglês' : 'Português';
+    $('tr-in').placeholder = pt ? 'Escreva aqui em português…' : 'Write here in English…';
+    $('tr-in-tools').hidden = pt;                     // botões de copiar/ouvir ficam no lado que está em inglês
+    $('tr-out-tools').hidden = !pt || !$('tr-out').textContent || $('tr-out').classList.contains('err');
+    if (!pt) $('tr-in-tools').hidden = !$('tr-in').value.trim();
+  }
+  function trDo() {
+    var text = $('tr-in').value.trim();
+    var out = $('tr-out');
+    if (!text) { out.textContent = ''; out.classList.remove('err'); trPaint(); return; }
+    var from = trDir === 'pt-en' ? 'pt' : 'en';
+    var to = trDir === 'pt-en' ? 'en' : 'pt';
+    var my = ++trTimer;
+    out.classList.remove('err');
+    out.textContent = 'Traduzindo…';
+    $('tr-out-tools').hidden = true;
+    translateText(text, from, to).then(function (t) {
+      if (my !== trTimer) return;
+      out.textContent = t;
+      trPaint();
+    }, function () {
+      if (my !== trTimer) return;
+      out.classList.add('err');
+      out.textContent = 'Não consegui traduzir agora. Verifique sua internet e tente de novo.';
+      trPaint();
+    });
+  }
+  function trSpeak(text) {
+    if (!text || !('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US';
+      u.rate = 0.95;
+      var vs = window.speechSynthesis.getVoices();
+      var v = vs.filter(function (x) { return /^en[-_]US/i.test(x.lang); })[0] || vs.filter(function (x) { return /^en/i.test(x.lang); })[0];
+      if (v) u.voice = v;
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* ignorar */ }
+  }
+  $('tr-go').addEventListener('click', trDo);
+  $('tr-in').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); trDo(); } });
+  $('tr-in').addEventListener('input', function () { if (trDir === 'en-pt') trPaint(); });
+  $('tr-swap').addEventListener('click', function () {
+    var out = $('tr-out');
+    var had = out.textContent && !out.classList.contains('err') && out.textContent !== 'Traduzindo…' ? out.textContent : '';
+    trDir = trDir === 'pt-en' ? 'en-pt' : 'pt-en';
+    $('tr-in').value = had;   // o resultado vira o novo texto de entrada
+    out.textContent = '';
+    out.classList.remove('err');
+    trPaint();
+    $('tr-in').focus();
+  });
+  $('pane-tr').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-tr]') : null;
+    if (!b) return;
+    var text = (b.getAttribute('data-box') === 'in' ? $('tr-in').value : $('tr-out').textContent).trim();
+    if (!text) return;
+    if (b.getAttribute('data-tr') === 'say') { trSpeak(text); return; }
+    A.copyText(text).then(function (ok) {
+      var old = b.textContent;
+      b.textContent = ok ? 'Copiado!' : 'Copie manualmente';
+      setTimeout(function () { b.textContent = old; }, 1500);
+    });
+  });
+  if (!('speechSynthesis' in window)) { document.querySelectorAll('[data-tr="say"]').forEach(function (b) { b.hidden = true; }); }
+  trPaint();
 
   // ---------- início ----------
   function init() {
