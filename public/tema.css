@@ -128,3 +128,9 @@ body.in-live .brandmark img, body.in-wait .brandmark img { height: 18px; }
 .btn-leave { background: var(--live); color: var(--on-live); border-color: var(--live-dk); box-shadow: 0 3px 0 var(--live-dk); }
 .bc-title { border-radius: 0; }
 .bc-chip { box-shadow: 0 2px 0 var(--line); }
+
+/* ouvinte (visto pelo professor) */
+.lsbar { position: absolute; left: 0; right: 0; top: 0; z-index: 5; background: #ffc800; color: #4a3200; font: 800 11px/16px Nunito, sans-serif; text-align: center; text-transform: uppercase; letter-spacing: .06em; pointer-events: none; border-radius: 10px 10px 0 0; }
+.pchip { position: relative; }
+.pchip.ls { padding-top: 14px; }
+.tile.ls .mvw, .tile.ls .tilekick { top: 20px; }

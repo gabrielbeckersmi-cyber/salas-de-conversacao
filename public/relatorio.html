@@ -68,7 +68,7 @@
     h += '<div class="grid">' +
       '<div class="stat"><b>' + T.joined + '</b><span>alunos entraram na aula</span></div>' +
       '<div class="stat"><b>' + T.attended + '</b><span>participaram de ao menos uma rodada</span></div>' +
-      '<div class="stat"><b>' + T.basico + ' / ' + T.intermediario + '</b><span>Básico / Intermediário (todos que entraram)</span></div>' +
+      '<div class="stat"><b>' + T.basico + ' / ' + T.intermediario + '</b><span>Básico / Intermediário' + (T.ouvintes ? ' (+ ' + T.ouvintes + ' ouvinte' + (T.ouvintes > 1 ? 's' : '') + ')' : '') + '</span></div>' +
       '<div class="stat"><b>' + T.attendedBasico + ' / ' + T.attendedIntermediario + '</b><span>Básico / Intermediário (participaram)</span></div>' +
       '<div class="stat"><b>' + hm(r.startedAt) + '</b><span>início da 1ª rodada</span></div>' +
       '<div class="stat"><b>' + hm(r.endedAt) + '</b><span>fim da aula</span></div>' +
@@ -83,7 +83,7 @@
       '</tbody></table></div></div>';
     h += '<div class="card"><h2>Alunos (' + r.students.length + ')</h2><div class="scroll"><table><thead><tr><th>Nome</th><th>Nível</th><th>Entrou às</th><th class="n">Rodadas</th></tr></thead><tbody>' +
       r.students.map(function (s) {
-        return '<tr><td>' + esc(s.name) + (s.late ? ' <span class="small">(entrou depois do início)</span>' : '') + '</td><td><span class="lv ' + (s.level === 'basico' ? 'b' : 'i') + '">' + A.LEVEL_NAME[s.level] + '</span></td><td>' + hm(s.joinedAt) + '</td><td class="n">' + (s.rounds.length ? s.rounds.join(' e ') : 'só sala de espera') + '</td></tr>';
+        return '<tr><td>' + esc(s.name) + (s.late ? ' <span class="small">(entrou depois do início)</span>' : '') + '</td><td><span class="lv ' + (s.level === 'basico' ? 'b' : 'i') + '">' + (s.listener ? 'Ouvinte' : A.LEVEL_NAME[s.level]) + '</span></td><td>' + hm(s.joinedAt) + '</td><td class="n">' + (s.rounds.length ? s.rounds.join(' e ') : 'só sala de espera') + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
     h += '<div class="card"><h2>Problemas de conexão (' + r.problems.total + ')</h2>';
     if (!r.problems.total) h += '<p>Nenhum problema de conexão registrado. 🎉</p>';

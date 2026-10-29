@@ -105,3 +105,10 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 ## Versão de 28/10 (6): painel do professor
 - Cada sala tem Entrar na sala (entra ouvindo e vendo, sem microfone/câmera; ao Atender entra falando e com câmera), igual à sala de espera; sua câmera aparece como "Você" nas salas e na sala de espera.
 - Transmissão em 3 passos; Sem sala ao lado da sala de espera; excluir aluno com confirmação; teclado do Tradutor só sobe ao tocar no campo.
+
+## Versão de 29/10: Ouvinte
+
+- Na entrada há 3 opções (Básico, Intermediário, Ouvinte); é obrigatório escolher uma. Ao escolher Ouvinte aparece um aviso com "Entrar como ouvinte" / "Cancelar".
+- Ouvinte na sala de espera: só vê quem está lá e um aviso no topo; sem jogo, sem teste de câmera, sem vídeo tutorial.
+- Quando a aula começa, o ouvinte é colocado numa sala Básica (a com menos alunos), sem aparecer para ninguém (participante oculto no LiveKit, sem publicar). Vê as pessoas e o chat, não tem botões, e mantém "Sair da aula".
+- O professor vê esses alunos com uma barra amarela "Ouvinte". Alunos não sabem que existem ouvintes. O relatório mostra "(+ N ouvintes)".

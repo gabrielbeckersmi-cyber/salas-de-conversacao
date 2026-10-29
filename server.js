@@ -73,11 +73,14 @@ function build(env) {
   const tokenCache = new Map();
   async function lkToken(o) {
     if (!lkReady) throw new C.AppError(500, 'livekit', 'LiveKit não configurado no servidor (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET).');
-    const key = o.room + '|' + o.identity;
+    const key = o.room + '|' + o.identity + (o.listener ? '|L' : '');
     const hit = tokenCache.get(key);
     if (hit && hit.exp > Date.now() + 600000) return hit.jwt;
     const at = new AccessToken(cfg.lkKey, cfg.lkSecret, { identity: o.identity, name: o.name, ttl: '3h' });
-    at.addGrant({ roomJoin: true, room: o.room, canPublish: true, canSubscribe: true, canPublishData: false });
+    // ouvinte: só assiste (não publica) e fica invisível para os outros participantes
+    at.addGrant(o.listener
+      ? { roomJoin: true, room: o.room, canPublish: false, canSubscribe: true, canPublishData: false, hidden: true }
+      : { roomJoin: true, room: o.room, canPublish: true, canSubscribe: true, canPublishData: false });
     const jwt = await at.toJwt();
     tokenCache.set(key, { jwt: jwt, exp: Date.now() + 3 * 3600000 });
     if (tokenCache.size > 5000) tokenCache.clear();
@@ -115,13 +118,13 @@ function build(env) {
     if (v.room && C.isLive(c)) {
       const room = lkRoomName(c, v.room.id);
       try {
-        v.room.lk = { url: cfg.lkUrl, room: room, token: await lkToken({ identity: s.pid, name: s.name, room: room }) };
+        v.room.lk = { url: cfg.lkUrl, room: room, token: await lkToken({ identity: s.pid, name: s.name, room: room, listener: s.listener }) };
       } catch (e) { v.room.lkError = e.message; }
     } else if (c.phase !== 'done') {
       // sem sala (espera, intervalo, encerramento): vai para a sala de espera em vídeo
       const room = lobbyRoomName(c);
       try {
-        v.lobby = { url: cfg.lkUrl, room: room, token: await lkToken({ identity: s.pid, name: s.name, room: room }) };
+        v.lobby = { url: cfg.lkUrl, room: room, token: await lkToken({ identity: s.pid, name: s.name, room: room, listener: s.listener }) };
       } catch (e) { v.lobbyError = e.message; }
     }
     return v;
@@ -253,7 +256,7 @@ function build(env) {
     const c = getClass(req.params.id);
     const s = C.joinStudent(c, { name: req.body.name, level: req.body.level, resumeId: req.body.resumeId });
     schedule(c);
-    res.json({ studentId: s.id, pid: s.pid, name: s.name, level: s.level });
+    res.json({ studentId: s.id, pid: s.pid, name: s.name, level: s.level, listener: !!s.listener });
   });
 
   function chatTargets(c, roomId) {
@@ -291,13 +294,18 @@ function build(env) {
 
 
   // ---------- dinâmicas da sala ----------
+  function dynCopy(c, room) {
+    return Object.assign({}, room, { members: room.members.filter(function (p) { const x = C.byPid(c, p); return x && !x.listener; }) });
+  }
   function dynRoom(c, studentId) {
     const s = c.students[String(studentId)];
     if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.');
+    if (s.listener) throw new C.AppError(403, 'listener', 'Como ouvinte você não consegue interagir.');
     const room = C.isLive(c) ? C.roomOf(c, s.pid) : null;
-    return { s: s, room: room };
+    return { s: s, room: room ? dynCopy(c, room) : null };
   }
-  function pushDyn(c, room) {
+  function pushDyn(c, room0) {
+    const room = dynCopy(c, room0);
     const r = reg(c.id);
     const now = Date.now();
     room.members.forEach(function (pid) {

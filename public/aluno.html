@@ -94,6 +94,14 @@
   @keyframes chatpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192, 40, 31, 0.5); } 50% { box-shadow: 0 0 0 6px rgba(192, 40, 31, 0); } }
   @media (prefers-reduced-motion: reduce) { .chat-new .chat-toggle { animation: none; } }
   .endmsg { white-space: pre-line; }
+  .lv-ouv { --lvl: #8a5300; --lvl-bg: #fff1cf; }
+  .ls-note { background: #fff1cf; color: #6b4200; border: 2px solid #f2b53d; font-weight: 800; }
+  body.listener #game, body.listener .check, body.listener #themes, body.listener .lobby .controls, body.listener .lobby-chat,
+  body.listener #live .controls, body.listener #live .devs, body.listener #l-call, body.listener #l-chat-form,
+  body.listener #tab-tr, body.listener #tab-dyn, body.listener #pane-tr, body.listener #pane-dyn { display: none !important; }
+  @media (min-width: 900px) and (min-height: 560px) { body.listener.in-wait #waiting .card { grid-template-columns: minmax(0, 1fr); } }
+  .join .seg.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .join .seg.three span { padding: 10px 2px; font-size: 13px; }
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
   .tab { font: inherit; font-weight: 600; font-size: 14px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer; min-height: 36px; }
   .tab.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
@@ -251,6 +259,7 @@
     <section id="waiting" hidden>
       <div class="card">
         <div class="w-head">
+        <div class="banner ls-note" id="w-ls" role="status" hidden></div>
         <p class="eyebrow" id="w-phase">Sala de espera</p>
         <h1 id="w-head">Aguardando o professor iniciar a aula</h1>
         <p id="w-sub"></p>
@@ -310,6 +319,7 @@
         <div class="timer" id="l-timer" aria-label="Tempo restante da rodada">--:--</div>
       </div>
       <div class="banner" id="l-banner" role="status" hidden></div>
+      <div class="banner ls-note" id="l-ls" role="status" hidden>Você está como ouvinte, portanto não consegue interagir.</div>
       <div class="msg err" id="l-warn" hidden>
         <span id="l-warn-text"></span>
         <button class="btn btn-sm" id="l-retry" type="button" hidden>Tentar de novo</button>
@@ -388,6 +398,17 @@
     </section>
     <footer class="brandmark"><img src="/logo.png" alt="" width="20" height="22"></footer>
   </main>
+
+  <div class="tut" id="ls-modal" role="dialog" aria-modal="true" aria-label="Entrar como ouvinte" hidden>
+    <div class="tut-box" style="max-width: 420px">
+      <h2>Entrar como ouvinte?</h2>
+      <p>Como ouvinte você não aparecerá para ninguém e não conseguirá interagir.</p>
+      <div class="tut-foot">
+        <button class="btn" id="ls-cancel" type="button">Cancelar</button>
+        <button class="btn btn-primary" id="ls-ok" type="button">Entrar como ouvinte</button>
+      </div>
+    </div>
+  </div>
 
   <div class="tut" id="tut" role="dialog" aria-modal="true" aria-label="Tutorial em vídeo" hidden>
     <div class="tut-box">

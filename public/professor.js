@@ -566,7 +566,7 @@
 
   function levelOf(r, by) {
     var set = new Set();
-    r.members.forEach(function (p) { if (by[p]) set.add(by[p].level); });
+    r.members.forEach(function (p) { if (by[p] && !by[p].listener) set.add(by[p].level); });
     if (!set.size) return null;
     return set.size > 1 ? 'misto' : Array.from(set)[0];
   }
@@ -578,7 +578,8 @@
     return '<label class="mvw" title="Mover para outra sala">&#8644;<select class="mv" data-pid="' + s.pid + '" aria-label="Mover ' + esc(s.name) + ' para outra sala">' + opts + '</select></label>';
   }
   function chipHTML(s, roomId) {
-    return '<div class="pchip ' + A.LEVEL_CLS[s.level] + (s.online ? '' : ' offline') + '" draggable="true" data-pid="' + s.pid + '">' +
+    return '<div class="pchip ' + A.LEVEL_CLS[s.level] + (s.listener ? ' ls' : '') + (s.online ? '' : ' offline') + '" draggable="true" data-pid="' + s.pid + '">' +
+      (s.listener ? '<span class="lsbar">Ouvinte</span>' : '') +
       '<span class="avatar">' + esc(A.initials(s.name)) + '</span>' +
       '<span class="pn" title="' + esc(s.name) + ' (' + A.LEVEL_NAME[s.level] + ')">' + esc(s.name) + '</span>' +
       '<span class="st ' + (s.online ? 'on' : 'off') + '" title="' + (s.online ? 'online' : 'offline') + '"></span>' +
@@ -587,7 +588,8 @@
       '</div>';
   }
   function tileHTML(r, s) {
-    return '<div class="tile ' + A.LEVEL_CLS[s.level] + (s.online ? '' : ' offline') + '" draggable="true" data-pid="' + s.pid + '" data-room="' + r.id + '">' +
+    return '<div class="tile ' + A.LEVEL_CLS[s.level] + (s.listener ? ' ls' : '') + (s.online ? '' : ' offline') + '" draggable="true" data-pid="' + s.pid + '" data-room="' + r.id + '">' +
+      (s.listener ? '<span class="lsbar">Ouvinte</span>' : '') +
       '<span class="avatar">' + esc(A.initials(s.name)) + '</span>' +
       '<span class="slot" data-room="' + r.id + '" data-pid="' + s.pid + '"></span>' +
       '<span class="nm" title="' + esc(s.name) + '">' + esc(s.name) + (s.online ? '' : ' (offline)') + '</span>' +
@@ -647,7 +649,8 @@
     return S.students.filter(function (s) { return s.online && !assigned.has(s.pid); });
   }
   function lobbyTileHTML(s) {
-    return '<div class="tile ' + A.LEVEL_CLS[s.level] + '" data-pid="' + s.pid + '" data-room="lobby">' +
+    return '<div class="tile ' + A.LEVEL_CLS[s.level] + (s.listener ? ' ls' : '') + '" data-pid="' + s.pid + '" data-room="lobby">' +
+      (s.listener ? '<span class="lsbar">Ouvinte</span>' : '') +
       '<span class="avatar">' + esc(A.initials(s.name)) + '</span>' +
       '<span class="slot" data-room="lobby" data-pid="' + s.pid + '"></span>' +
       '<span class="nm" title="' + esc(s.name) + '">' + esc(s.name) + '</span>' +

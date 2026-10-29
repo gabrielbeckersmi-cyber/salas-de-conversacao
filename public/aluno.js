@@ -102,9 +102,8 @@
 
   function screenJoin(note) {
     var started = publicInfo && publicInfo.phase !== 'lobby' && !publicInfo.allowLate;
-    var saved = '';
-    try { saved = localStorage.getItem('salas:level') || ''; } catch (e) { saved = ''; }
-    var lv = saved === 'intermediario' ? 'intermediario' : 'basico';
+    var lv = '';   // o aluno precisa escolher o nível
+    var okListener = false;
     say('<form class="card join" id="join-form" novalidate>' +
       '<h1>' + A.esc(publicInfo ? publicInfo.title : 'Aula de conversação') + '</h1>' +
       (started
@@ -112,9 +111,9 @@
         : '') +
       (note ? '<div class="msg err" role="alert">' + A.esc(note) + '</div>' : '') +
       '<div class="field"><label class="lbl" for="j-name">Seu nome</label><input class="input" id="j-name" maxlength="30" autocomplete="name" placeholder="Ex.: Marcos P." required></div>' +
-      '<div class="field"><span class="lbl-t">Seu nível</span><fieldset class="seg" aria-label="Seu nível">' +
-      ['basico', 'intermediario'].map(function (l) {
-        return '<label class="' + A.LEVEL_CLS[l] + '"><input type="radio" name="level" value="' + l + '"' + (lv === l ? ' checked' : '') + '><span>' + A.LEVEL_NAME[l] + '</span></label>';
+      '<div class="field"><span class="lbl-t">Seu nível</span><fieldset class="seg three" aria-label="Seu nível">' +
+      [['basico', 'Básico', A.LEVEL_CLS.basico], ['intermediario', 'Intermediário', A.LEVEL_CLS.intermediario], ['ouvinte', 'Ouvinte', 'lv-ouv']].map(function (l) {
+        return '<label class="' + l[2] + '"><input type="radio" name="level" value="' + l[0] + '"><span>' + l[1] + '</span></label>';
       }).join('') + '</fieldset></div>' +
       '<div class="msg err" id="j-err" role="alert" hidden></div>' +
       '<button class="btn btn-primary" id="j-go" type="submit">Entrar na aula</button>' +
@@ -126,6 +125,8 @@
       var level = form.elements.level.value;
       var err = $('j-err');
       err.hidden = true;
+      if (!level) { err.textContent = 'Escolha o seu nível: Básico, Intermediário ou Ouvinte.'; err.hidden = false; return; }
+      if (level === 'ouvinte' && !okListener) { $('ls-modal').hidden = false; return; }
       if (name.length < 2) { err.textContent = 'Digite seu nome (mínimo 2 letras).'; err.hidden = false; $('j-name').focus(); return; }
       $('j-go').disabled = true;
       A.api('POST', '/api/classes/' + classId + '/join', { name: name, level: level, resumeId: session && session.studentId })
@@ -140,6 +141,22 @@
           err.hidden = false;
         });
     });
+    form.addEventListener('change', function (e) {
+      if (!e.target || e.target.name !== 'level') return;
+      okListener = false;
+      if (e.target.value === 'ouvinte') $('ls-modal').hidden = false;
+    });
+    $('ls-cancel').onclick = function () {
+      $('ls-modal').hidden = true;
+      var r = form.querySelector('input[value=ouvinte]'); if (r) r.checked = false;
+      okListener = false;
+    };
+    $('ls-ok').onclick = function () {
+      okListener = true;
+      $('ls-modal').hidden = true;
+      if ($('j-name').value.trim().length >= 2) form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true }));
+      else { $('j-name').focus(); }
+    };
     setTimeout(function () { var n = $('j-name'); if (n) n.focus(); }, 50);
   }
 
@@ -308,6 +325,12 @@
 
   function render() {
     $('title').textContent = snap.title;
+    var isLs = !!(snap.me && snap.me.listener);
+    document.body.classList.toggle('listener', isLs);
+    var wls = $('w-ls');
+    wls.hidden = !isLs;
+    wls.textContent = snap.phase === 'closing' ? 'Você está como ouvinte na sala de espera, ninguém te vê ou te ouve.' : 'Você está como ouvinte na sala de espera, ninguém te vê ou te ouve, a aula já vai começar.';
+    $('l-ls').hidden = !isLs;
     var running = snap.phase === 'r1' || snap.phase === 'r2';
     if (snap.phase === 'done') {
       leaveLive(); leaveLobby(); stopCheck(); window.Jogo.stop();
@@ -324,10 +347,10 @@
       return;
     }
     leaveLive();
-    if (snap.phase !== 'lobby') closeTutorial();
+    if (snap.phase !== 'lobby' || isLs) closeTutorial();
     showOnly('waiting');
     updateWaiting(running);
-    window.Jogo.start();
+    if (!isLs) window.Jogo.start();
     renderRank();
     connectLobby(snap.lobby, snap.lobbyError);
     tickTimer();
@@ -371,7 +394,7 @@
       $('w-head').textContent = '';
       $('w-sub').textContent = '';
       $('w-note').textContent = '';
-      maybeTutorial();
+      if (!(snap.me && snap.me.listener)) maybeTutorial();
     }
   }
 
@@ -741,6 +764,7 @@
   }
 
   function enableMedia(room, seq) {
+    if (snap && snap.me && snap.me.listener) { setWarn(null); return Promise.resolve(); }   // ouvinte não liga câmera nem microfone
     var micErr = null;
     var camErr = null;
     var want = lastMedia || { mic: true, cam: true };   // sem histórico (entrou direto na sala): liga os dois
@@ -789,7 +813,11 @@
   function leaveLive() {
     connSeq++;
     clearTimeout(retryTimer);
-    if (live) { var r = live.room; live = null; try { r.disconnect(); } catch (e) { /* ignorar */ } }
+    if (live) {
+      var r = live.room; live = null;
+      if (lastMedia) lastMedia = { mic: false, cam: lastMedia.cam };   // volta para a sala de espera com o microfone desligado; a câmera fica como estava
+      try { r.disconnect(); } catch (e) { /* ignorar */ }
+    }
     clearTiles();
     hideScreen();
     setWarn(null);
@@ -925,7 +953,7 @@
     if (pub.kind === 'audio') t.el.classList.toggle('mic-off', muted);
   }
   function lobbyLocal(room) {
-    if (!snap) return;
+    if (!snap || snap.me.listener) return;
     var t = lobbyTile(snap.me.pid, snap.me.name);
     var cam = room.localParticipant.getTrackPublication(LK.Track.Source.Camera);
     if (cam && cam.track) { cam.track.attach(t.video); t.el.classList.add('has-video'); t.el.classList.toggle('video-off', cam.isMuted); }
