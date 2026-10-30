@@ -223,3 +223,8 @@
 .bcast summary { padding: 10px 16px; }
 .bcast[open] > summary { border-bottom: 1px solid var(--line); }
 .bc-title { padding: 8px 16px; }
+
+.tile .tilemute { position: absolute; right: 4px; bottom: 4px; z-index: 2; width: 24px; height: 24px; padding: 3px; border-radius: 8px; opacity: 0.85; min-height: 0; }
+.tile .tilemute:hover { opacity: 1; }
+.tile .tilemute svg { width: 100%; height: 100%; }
+.room-head .btn-sm { margin-left: auto; margin-right: 8px; }

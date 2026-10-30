@@ -172,10 +172,7 @@ test('aula completa com 28 alunos', async function (t) {
     assert.strictEqual(j.payload.video.room, r.lk.room);
   }
 
-  // --- aula trancada: aluno novo não entra, aluno antigo volta ---
-  const blocked = await api('POST', '/api/classes/' + CID + '/join', { name: 'Penetra', level: 'basico' });
-  assert.strictEqual(blocked.status, 403);
-  assert.strictEqual(blocked.json.error, 'started');
+  // --- aluno antigo volta ---
   const back = await api('POST', '/api/classes/' + CID + '/join', { resumeId: students[3].id });
   assert.strictEqual(back.status, 200);
   assert.strictEqual(back.json.pid, students[3].pid);

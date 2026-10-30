@@ -100,15 +100,60 @@
     say('<div class="card join"><h1>Aula encerrada</h1><p class="endmsg">' + A.esc(text) + '</p>' + btn + '</div>');
   }
 
-  function screenJoin(note) {
-    var started = publicInfo && publicInfo.phase !== 'lobby' && !publicInfo.allowLate;
-    var lv = '';   // o aluno precisa escolher o nível
+  // ---------- foto de perfil (salva só neste aparelho) ----------
+  var PHOTO_KEY = 'salas:photo';
+  function getPhoto() { try { return localStorage.getItem(PHOTO_KEY) || ''; } catch (e) { return ''; } }
+  function setPhoto(v) { try { if (v) localStorage.setItem(PHOTO_KEY, v); else localStorage.removeItem(PHOTO_KEY); } catch (e) { /* ignorar */ } }
+  function resizePhoto(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        var side = Math.min(img.width, img.height);
+        var c = document.createElement('canvas');
+        c.width = c.height = 128;
+        c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 128, 128);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Não consegui abrir essa imagem.')); };
+      img.src = url;
+    });
+  }
+  function uploadPhoto() {
+    var p = getPhoto();
+    if (!p || !session) return Promise.resolve();
+    return A.api('POST', '/api/classes/' + classId + '/foto', { studentId: session.studentId, photo: p }).catch(function () { /* ignorar */ });
+  }
+  var PERSON = '<svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="4.2"/><path d="M3.5 21c0-4.6 3.8-7.5 8.5-7.5s8.5 2.9 8.5 7.5z"/></svg>';
+  function paintPhotoPick() {
+    var p = getPhoto();
+    var c = $('j-photo');
+    if (!c) return;
+    c.innerHTML = p ? '<img alt="Sua foto" src="' + p + '">' : PERSON;
+    $('j-photo-txt').textContent = p ? 'Trocar foto' : 'Adicionar foto';
+    $('j-photo-del').hidden = !p;
+  }
+
+  function doJoin(name, level) {
+    stopPre();
+    say('<div class="card join"><p>Entrando…</p></div>');
+    A.api('POST', '/api/classes/' + classId + '/join', { name: name, level: level, resumeId: session && session.studentId })
+      .then(function (r) {
+        session = { studentId: r.studentId, pid: r.pid, name: r.name, level: r.level };
+        try { localStorage.setItem(KEY, JSON.stringify(session)); localStorage.setItem('salas:level', r.level); } catch (e2) { /* ignorar */ }
+        return uploadPhoto().then(function () { openSession(); });
+      })
+      .catch(function (ex) { screenJoin(ex.message, { name: name, level: level === 'ouvinte' ? 'ouvinte' : level }); });
+  }
+
+  function screenJoin(note, pre) {
     var okListener = false;
     say('<form class="card join" id="join-form" novalidate>' +
+      '<div class="photo-pick"><button type="button" class="photo-circle" id="j-photo" aria-label="Adicionar foto"></button>' +
+      '<div class="photo-act"><button type="button" class="linkbtn" id="j-photo-txt">Adicionar foto</button><button type="button" class="linkbtn dim" id="j-photo-del" hidden>Remover</button></div>' +
+      '<input type="file" id="j-file" accept="image/*" hidden></div>' +
       '<h1>' + A.esc(publicInfo ? publicInfo.title : 'Aula de conversação') + '</h1>' +
-      (started
-        ? '<div class="msg info">Esta aula já começou e não aceita novos alunos. Se você já tinha entrado, digite o mesmo nome para voltar.</div>'
-        : '') +
       (note ? '<div class="msg err" role="alert">' + A.esc(note) + '</div>' : '') +
       '<div class="field"><label class="lbl" for="j-name">Seu nome</label><input class="input" id="j-name" maxlength="30" autocomplete="name" placeholder="Ex.: Marcos P." required></div>' +
       '<div class="field"><span class="lbl-t">Seu nível</span><fieldset class="seg three" aria-label="Seu nível">' +
@@ -116,9 +161,24 @@
         return '<label class="' + l[2] + '"><input type="radio" name="level" value="' + l[0] + '"><span>' + l[1] + '</span></label>';
       }).join('') + '</fieldset></div>' +
       '<div class="msg err" id="j-err" role="alert" hidden></div>' +
-      '<button class="btn btn-primary" id="j-go" type="submit">Entrar na aula</button>' +
+      '<button class="btn btn-primary" id="j-go" type="submit">Continuar</button>' +
       '</form>');
     var form = $('join-form');
+    if (pre) {
+      $('j-name').value = pre.name || '';
+      var rr = form.querySelector('input[value="' + pre.level + '"]');
+      if (rr) rr.checked = true;
+    }
+    paintPhotoPick();
+    $('j-photo').addEventListener('click', function () { $('j-file').click(); });
+    $('j-photo-txt').addEventListener('click', function () { $('j-file').click(); });
+    $('j-photo-del').addEventListener('click', function () { setPhoto(''); paintPhotoPick(); });
+    $('j-file').addEventListener('change', function () {
+      var f = this.files && this.files[0];
+      if (!f) return;
+      resizePhoto(f).then(function (d) { setPhoto(d); paintPhotoPick(); }, function (ex) { var er = $('j-err'); er.textContent = ex.message; er.hidden = false; });
+      this.value = '';
+    });
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var name = $('j-name').value.trim();
@@ -128,18 +188,8 @@
       if (!level) { err.textContent = 'Escolha o seu nível: Básico, Intermediário ou Ouvinte.'; err.hidden = false; return; }
       if (level === 'ouvinte' && !okListener) { $('ls-modal').hidden = false; return; }
       if (name.length < 2) { err.textContent = 'Digite seu nome (mínimo 2 letras).'; err.hidden = false; $('j-name').focus(); return; }
-      $('j-go').disabled = true;
-      A.api('POST', '/api/classes/' + classId + '/join', { name: name, level: level, resumeId: session && session.studentId })
-        .then(function (r) {
-          session = { studentId: r.studentId, pid: r.pid, name: r.name, level: r.level };
-          try { localStorage.setItem(KEY, JSON.stringify(session)); localStorage.setItem('salas:level', r.level); } catch (e2) { /* ignorar */ }
-          openSession();
-        })
-        .catch(function (ex) {
-          $('j-go').disabled = false;
-          err.textContent = ex.message;
-          err.hidden = false;
-        });
+      if (level === 'ouvinte') doJoin(name, level);      // ouvinte não precisa testar câmera e microfone
+      else screenPre(name, level);                       // os outros testam antes de entrar
     });
     form.addEventListener('change', function (e) {
       if (!e.target || e.target.name !== 'level') return;
@@ -157,7 +207,228 @@
       if ($('j-name').value.trim().length >= 2) form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true }));
       else { $('j-name').focus(); }
     };
-    setTimeout(function () { var n = $('j-name'); if (n) n.focus(); }, 50);
+    setTimeout(function () { var n = $('j-name'); if (n && !n.value) n.focus(); }, 50);
+  }
+
+  // ---------- teste de câmera e microfone antes de entrar ----------
+  var preCtl = null;
+  function stopPre() { if (preCtl) { preCtl.stop(); preCtl = null; } }
+  function screenPre(name, level) {
+    stopPre();
+    var stream = null, ctx = null, raf = 0, micOk = false, attempts = 0, pop = null, rec = null, testTimer = null, testing = false;
+    say('<div class="card join pre">' +
+      '<div class="pre-cam"><video id="pre-video" autoplay muted playsinline></video><div class="pre-novideo" id="pre-novideo" hidden>Câmera indisponível</div></div>' +
+      '<p class="small pre-help">A câmera não funciona? Tente apertar no botão abaixo e selecionar outra.</p>' +
+      '<select class="input" id="pre-cam" aria-label="Escolher câmera"></select>' +
+      '<div class="msg err" id="pre-perm" role="alert" hidden><span id="pre-perm-txt"></span> <button class="btn btn-sm" id="pre-perm-btn" type="button">Permitir</button></div>' +
+      '<div class="msg err" id="pre-err" role="alert" hidden></div>' +
+      '<button class="btn btn-primary blink" id="pre-mic" type="button">Testar microfone</button>' +
+      '<button class="btn" id="pre-go" type="button" disabled>Teste seu microfone antes de entrar</button>' +
+      '<button class="linkbtn dim" id="pre-back" type="button">← Voltar</button>' +
+      '</div>');
+
+    function closePop() { if (pop) { pop.remove(); pop = null; } }
+    function openPop(html) { closePop(); pop = document.createElement('div'); pop.className = 'tut'; pop.innerHTML = '<div class="tut-box pre-pop">' + html + '</div>'; document.body.appendChild(pop); return pop; }
+    function stopListen() {
+      testing = false;
+      clearTimeout(testTimer);
+      cancelAnimationFrame(raf);
+      if (rec) { try { rec.onresult = rec.onerror = rec.onend = null; rec.abort(); } catch (e) { /* ignorar */ } rec = null; }
+      if (ctx) { ctx.close().catch(function () { /* ignorar */ }); ctx = null; }
+    }
+    function stopStream() {
+      stopListen();
+      if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+      var v = $('pre-video'); if (v) v.srcObject = null;
+    }
+    preCtl = { stop: function () { stopStream(); closePop(); } };
+    function setErr(t) { var e = $('pre-err'); if (!e) return; e.textContent = t || ''; e.hidden = !t; }
+    function paintButtons() {
+      var m = $('pre-mic'), g = $('pre-go');
+      if (!m || !g) return;
+      m.classList.toggle('blink', !micOk);
+      g.disabled = !micOk;
+      g.className = 'btn' + (micOk ? ' btn-primary go-ready' : '');
+      g.textContent = micOk ? 'Entrar na aula' : 'Teste seu microfone antes de entrar';
+    }
+    function showPerm() {
+      var q = navigator.permissions && navigator.permissions.query ? navigator.permissions.query({ name: 'microphone' }).then(function (r) { return r.state; }, function () { return 'prompt'; }) : Promise.resolve('prompt');
+      q.then(function (st) {
+        if (!$('pre-perm')) return;
+        var denied = st === 'denied';
+        $('pre-perm-txt').textContent = denied
+          ? 'O navegador está bloqueando a câmera e o microfone. Toque no cadeado ao lado do endereço, permita Câmera e Microfone e depois toque em "Tentar de novo". Se não resolver, recarregue a página.'
+          : 'Precisamos da sua permissão para usar a câmera e o microfone. Toque no botão e escolha "Permitir".';
+        $('pre-perm-btn').textContent = denied ? 'Tentar de novo' : 'Permitir';
+        $('pre-perm').hidden = false;
+      });
+    }
+    function fillCams(ids) {
+      listDevices().then(function (l) {
+        if (!$('pre-cam')) return;
+        fillSelect($('pre-cam'), l.cams, ids.cam, 'Câmera');
+        var cur = l.cams.filter(function (d) { return d.deviceId === ids.cam; })[0];
+        var rc = realCam(l.cams);
+        var pr = loadPrefs();
+        if (!pr.cam && cur && VIRTUAL.test(cur.label) && rc && !fillCams.retried) { fillCams.retried = true; open({ cam: rc.deviceId }); }
+      });
+    }
+    function onStream(st) {
+      stream = st;
+      $('pre-perm').hidden = true;
+      var v = $('pre-video');
+      v.srcObject = st;
+      v.play().catch(function () { /* ignorar */ });
+      var hasCam = st.getVideoTracks().length > 0;
+      $('pre-novideo').hidden = hasCam;
+      v.hidden = !hasCam;
+      var ids = currentIds(st);
+      fillCams(ids);
+    }
+    function open(o) {
+      o = o || {};
+      stopStream();
+      setErr('');
+      var pr = loadPrefs();
+      var cam = o.cam !== undefined ? o.cam : pr.cam;
+      var mic = o.mic !== undefined ? o.mic : pr.mic;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setErr('Este navegador não permite usar a câmera e o microfone aqui. Abra o link no Chrome ou Safari atualizado.');
+        return Promise.resolve();
+      }
+      var gum = function (c, m, video) {
+        return navigator.mediaDevices.getUserMedia({ video: video ? (c ? { deviceId: { exact: c } } : true) : false, audio: m ? { deviceId: { exact: m } } : true });
+      };
+      return gum(cam, mic, true)
+        .catch(function (e) { if (e && e.name === 'OverconstrainedError') { savePrefs({}); return gum(undefined, undefined, true); } throw e; })
+        .catch(function (e) {
+          // problema só na câmera (não achou ou está em uso): segue só com o microfone
+          if (e && (e.name === 'NotFoundError' || e.name === 'NotReadableError' || e.name === 'AbortError')) {
+            return gum(undefined, mic, false).then(function (st) {
+              setErr(e.name === 'NotReadableError' ? 'A câmera está sendo usada por outro aplicativo. Feche-o e escolha a câmera de novo, ou entre sem câmera.' : 'Não encontrei uma câmera. Você pode entrar sem câmera.');
+              return st;
+            });
+          }
+          throw e;
+        })
+        .then(onStream, function (e) {
+          if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) showPerm();
+          else if (e && e.name === 'NotFoundError') setErr('Não encontrei microfone neste aparelho.');
+          else if (e && e.name === 'NotReadableError') setErr('O microfone está sendo usado por outro aplicativo. Feche-o e tente de novo.');
+          else setErr('Não consegui acessar a câmera e o microfone.');
+        });
+    }
+    $('pre-perm-btn').addEventListener('click', function () { open(); });
+    $('pre-cam').addEventListener('change', function () {
+      var p = loadPrefs(); p.cam = this.value; savePrefs(p);
+      open({ cam: p.cam, mic: p.mic });
+    });
+    $('pre-back').addEventListener('click', function () { stopPre(); screenJoin(null, { name: name, level: level }); });
+    $('pre-go').addEventListener('click', function () { if (micOk) doJoin(name, level); });
+    $('pre-mic').addEventListener('click', function () { attempts = 0; runTest(); });
+
+    // ----- teste do microfone: fala + reconhecimento de voz grátis do navegador (e medidor de volume como reforço) -----
+    function micPerm() {
+      return navigator.permissions && navigator.permissions.query ? navigator.permissions.query({ name: 'microphone' }).then(function (r) { return r.state; }, function () { return 'granted'; }) : Promise.resolve('granted');
+    }
+    function runTest() {
+      var track = stream && stream.getAudioTracks()[0];
+      if (!track || track.readyState !== 'live') { open().then(function () { if (stream && stream.getAudioTracks()[0]) runTest(); }); return; }
+      stopListen();
+      testing = true;
+      openPop('<h2>Fale algo para testar seu microfone</h2><div class="meter" aria-hidden="true"><i id="pp-meter"></i></div><p class="small" id="pp-heard">&nbsp;</p>');
+      var maxPeak = 0, hits = 0, sttErr = '';
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        try {
+          ctx = new AC();
+          if (ctx.state === 'suspended') ctx.resume();
+          var an = ctx.createAnalyser();
+          an.fftSize = 512;
+          ctx.createMediaStreamSource(new MediaStream([track])).connect(an);
+          var buf = new Uint8Array(an.fftSize);
+          var tick = function () {
+            if (!testing) return;
+            an.getByteTimeDomainData(buf);
+            var peak = 0;
+            for (var i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i] - 128) / 128);
+            maxPeak = Math.max(maxPeak, peak);
+            var m = $('pp-meter'); if (m) m.style.width = Math.min(100, peak * 260) + '%';
+            if (peak > 0.1) hits++;   // soma os instantes de voz; ruído ambiente fica abaixo disso
+            if (hits >= 3) { success(); return; }
+            raf = requestAnimationFrame(tick);
+          };
+          tick();
+        } catch (e) { /* sem medidor: só o reconhecimento de voz */ }
+      }
+      var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SR) {
+        try {
+          rec = new SR();
+          rec.lang = 'en-US';
+          rec.interimResults = true;
+          rec.continuous = false;
+          rec.onresult = function (ev) {
+            var t = '';
+            for (var i = ev.resultIndex; i < ev.results.length; i++) t += ev.results[i][0].transcript;
+            t = t.trim();
+            if (t) { var h = $('pp-heard'); if (h) h.textContent = '“' + t + '”'; success(); }
+          };
+          rec.onerror = function (ev) { sttErr = ev && ev.error || ''; };
+          rec.start();
+        } catch (e) { rec = null; }
+      }
+      testTimer = setTimeout(function () { if (testing) fail(maxPeak, sttErr); }, 3000);
+    }
+    function success() {
+      if (!testing) return;
+      stopListen();
+      micOk = true;
+      attempts = 0;
+      paintButtons();
+      openPop('<div class="okpop"><svg viewBox="0 0 52 52" width="72" height="72" aria-hidden="true"><circle cx="26" cy="26" r="24" fill="none" stroke="#2fb457" stroke-width="3"/><path d="M14 27l8 8 16-17" fill="none" stroke="#2fb457" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><h2>Seu microfone está funcionando!</h2></div>');
+      setTimeout(closePop, 1300);
+    }
+    function fail(maxPeak, sttErr) {
+      stopListen();
+      var track = stream && stream.getAudioTracks()[0];
+      micPerm().then(function (st) {
+        var permProblem = st !== 'granted' || !track || track.readyState !== 'live' || sttErr === 'not-allowed' || sttErr === 'service-not-allowed' && maxPeak === 0;
+        if (permProblem && (st !== 'granted' || !track || track.readyState !== 'live')) {
+          closePop();
+          showPerm();
+          return;
+        }
+        attempts++;
+        if (attempts >= 3) { showListenerOffer(); return; }
+        openPop('<h2>Não consegui ouvir</h2><p>Não consegui ouvir, tente de novo ou experimente selecionar outro microfone</p>' +
+          '<div id="pp-micwrap" hidden><select class="input" id="pp-mic" aria-label="Escolher microfone"></select></div>' +
+          '<div class="tut-foot"><button class="btn" id="pp-switch" type="button">Trocar de microfone</button><button class="btn btn-primary" id="pp-retry" type="button">Tentar de novo</button></div>');
+        $('pp-retry').addEventListener('click', function () { closePop(); runTest(); });
+        $('pp-switch').addEventListener('click', function () {
+          listDevices().then(function (l) {
+            var cur = currentIds(stream).mic;
+            fillSelect($('pp-mic'), l.mics, cur, 'Microfone');
+            $('pp-micwrap').hidden = false;
+            $('pp-switch').hidden = true;
+          });
+        });
+        $('pp-mic').addEventListener('change', function () {
+          var p = loadPrefs(); p.mic = this.value; savePrefs(p);
+          micOk = false; paintButtons();
+          open({ cam: p.cam, mic: p.mic });
+        });
+      });
+    }
+    function showListenerOffer() {
+      openPop('<h2>Problemas com o microfone?</h2><p>Se o seu microfone está com problemas você pode participar como ouvinte.</p>' +
+        '<div class="tut-foot"><button class="btn" id="pp-keep" type="button">Continuar testando microfone</button><button class="btn btn-primary" id="pp-listen" type="button">Participar como ouvinte</button></div>');
+      $('pp-keep').addEventListener('click', function () { attempts = 0; closePop(); runTest(); });
+      $('pp-listen').addEventListener('click', function () { closePop(); doJoin(name, 'ouvinte'); });
+    }
+
+    paintButtons();
+    open();
   }
 
   // ---------- conexão com o servidor da aula ----------
@@ -192,10 +463,25 @@
   function onMessage(m) {
     if (m.type === 'state') {
       snap = m.data;
+      A.setPhotos(classId, snap.photos);
       offset = snap.now - Date.now();
       render();
+      tiles.forEach(function (t, pid) { A.paintAvatar(t.el, pid); });
+      lTiles.forEach(function (t, pid) { if (!isProf(pid)) A.paintAvatar(t.el, pid); });
     } else if (m.type === 'dyn') {
       if (snap && snap.room && m.roomId === snap.room.id) dynSet(m.data);
+    } else if (m.type === 'mute') {
+      if (live && live.room.localParticipant.isMicrophoneEnabled) {
+        live.room.localParticipant.setMicrophoneEnabled(false).then(function () { attachLocalVideo(live.room); updateControls(); });
+        updateControls({ mic: false });
+        setWarn('O professor desligou o seu microfone. Toque em Microfone para ligar de novo.', false);
+        setTimeout(function () { if (live) setWarn(null); }, 7000);
+      } else if (lobby && lobby.room.localParticipant.isMicrophoneEnabled) {
+        lobby.room.localParticipant.setMicrophoneEnabled(false).then(function () { lobbyLocal(lobby.room); lobbyControls(); });
+        lobbyControls({ mic: false });
+        lobbyWarn('O professor desligou o seu microfone. Toque em Microfone para ligar de novo.');
+        setTimeout(function () { lobbyWarn(null); }, 7000);
+      }
     } else if (m.type === 'chat') {
       if (m.roomId === 'lobby') addLobbyChat(m.msg);
       else if (snap && snap.room && m.roomId === snap.room.id) addChat(m.msg);
@@ -593,8 +879,9 @@
   function makeTile(pid, name, isMe) {
     var el = document.createElement('div');
     el.className = 'tile ' + A.LEVEL_CLS[snap.me.level] + (isMe ? ' me' : '');
-    el.innerHTML = '<span class="avatar">' + A.esc(A.initials(name)) + '</span><video autoplay playsinline' + (isMe ? ' muted' : '') + '></video>' +
+    el.innerHTML = A.avatar(name, pid) + '<video autoplay playsinline' + (isMe ? ' muted' : '') + '></video>' +
       '<span class="nm">' + A.esc(isMe ? name + ' (você)' : name) + '</span><span class="micoff">' + A.ICON.micoff + '</span>';
+    if (isMe) bindFx(el, function () { return live && live.room; }, fxWarnLive);
     return { el: el, video: el.querySelector('video') };
   }
   function getTile(pid, name) {
@@ -637,7 +924,74 @@
     }
     var mic = room.localParticipant.getTrackPublication(LK.Track.Source.Microphone);
     t.el.classList.toggle('mic-off', !mic || mic.isMuted);
+    keepBlur(room, fxWarnLive);
   }
+
+  // ---------- borrar o fundo da câmera ----------
+  var wantBlur = false;
+  var FX_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 20c0-3.6 2.9-5.8 6.5-5.8s6.5 2.2 6.5 5.8z"/><circle cx="4" cy="5" r="1.1" opacity=".55"/><circle cx="20" cy="5" r="1.1" opacity=".55"/><circle cx="3.5" cy="12" r="1.1" opacity=".55"/><circle cx="20.5" cy="12" r="1.1" opacity=".55"/></svg>';
+  function loadBlurLib() {
+    return new Promise(function (resolve, reject) {
+      if (window.LKBlur) { resolve(); return; }
+      var sc = document.createElement('script');
+      sc.src = '/vendor/blur.js';
+      sc.onload = function () { resolve(); };
+      sc.onerror = function () { reject(new Error('lib')); };
+      document.head.appendChild(sc);
+    });
+  }
+  function camTrackOf(room) {
+    var pub = room && room.localParticipant.getTrackPublication(LK.Track.Source.Camera);
+    return pub && pub.track ? pub.track : null;
+  }
+  function applyBlur(room, on) {
+    var track = camTrackOf(room);
+    if (!track) return Promise.resolve();
+    var has = track.getProcessor && track.getProcessor();
+    if (!on) return has ? track.stopProcessor() : Promise.resolve();
+    if (has) return Promise.resolve();
+    return loadBlurLib().then(function () {
+      if (!window.LKBlur.supported()) throw new Error('unsupported');
+      return track.setProcessor(window.LKBlur.BackgroundProcessor({ mode: 'background-blur', blurRadius: 12 }));
+    });
+  }
+  // reaplica o efeito quando a câmera é ligada de novo ou o aluno troca de sala
+  function keepBlur(room, warn) {
+    if (!wantBlur) return;
+    applyBlur(room, true).catch(function () { wantBlur = false; paintFx(); warn(); });
+  }
+  function paintFx() {
+    document.querySelectorAll('.tile .fxbtn').forEach(function (b) { b.classList.toggle('on', wantBlur); b.setAttribute('aria-pressed', String(wantBlur)); });
+  }
+  // clicar na própria imagem (com a câmera ligada) mostra o botão do efeito
+  function bindFx(el, getRoom, warn) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fxbtn';
+    b.title = 'Borrar o fundo';
+    b.setAttribute('aria-label', 'Borrar o fundo');
+    b.innerHTML = FX_ICON;
+    el.appendChild(b);
+    var hideT = null;
+    el.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('.fxbtn')) return;
+      el.classList.toggle('fx-open');
+      clearTimeout(hideT);
+      if (el.classList.contains('fx-open')) hideT = setTimeout(function () { el.classList.remove('fx-open'); }, 5000);
+    });
+    b.addEventListener('click', function () {
+      var room = getRoom();
+      if (!room) return;
+      wantBlur = !wantBlur;
+      paintFx();
+      applyBlur(room, wantBlur).catch(function () { wantBlur = false; paintFx(); warn(); });
+      clearTimeout(hideT);
+      hideT = setTimeout(function () { el.classList.remove('fx-open'); }, 3000);
+    });
+    paintFx();
+  }
+  function fxWarnLive() { setWarn('Não consegui borrar o fundo neste aparelho ou navegador.', false); setTimeout(function () { if (live) setWarn(null); }, 6000); }
+  function fxWarnLobby() { lobbyWarn('Não consegui borrar o fundo neste aparelho ou navegador.'); setTimeout(function () { lobbyWarn(null); }, 6000); }
 
   // estado de microfone e câmera que o aluno estava usando: segue com ele entre sala de espera e salas
   var lastMedia = null;
@@ -650,11 +1004,11 @@
       .then(function () { if (micErr || camErr) onErr(micErr, camErr); });
   }
   function sw(on) { return '<span class="sw' + (on ? ' on' : '') + '" aria-hidden="true"><i></i></span>'; }
-  function updateControls() {
+  function updateControls(opt) {   // opt: estado que o aluno acabou de pedir; o botão muda na hora, sem esperar o navegador
     if (!live) return;
     var lp = live.room.localParticipant;
-    var micOn = lp.isMicrophoneEnabled;
-    var camOn = lp.isCameraEnabled;
+    var micOn = opt && opt.mic !== undefined ? opt.mic : lp.isMicrophoneEnabled;
+    var camOn = opt && opt.cam !== undefined ? opt.cam : lp.isCameraEnabled;
     lastMedia = { mic: micOn, cam: camOn };
     var mic = $('l-mic');
     var cam = $('l-cam');
@@ -882,12 +1236,18 @@
   $('l-mic').addEventListener('click', function () {
     if (!live) return;
     var lp = live.room.localParticipant;
-    lp.setMicrophoneEnabled(!lp.isMicrophoneEnabled).then(function () { attachLocalVideo(live.room); updateControls(); }, function () { setWarn('Não consegui usar o microfone. Verifique a permissão do navegador.', true); });
+    var next = !lp.isMicrophoneEnabled;
+    updateControls({ mic: next });
+    var me = tiles.get(snap.me.pid); if (me) me.el.classList.toggle('mic-off', !next);
+    lp.setMicrophoneEnabled(next).then(function () { attachLocalVideo(live.room); updateControls(); }, function () { updateControls(); setWarn('Não consegui usar o microfone. Verifique a permissão do navegador.', true); });
   });
   $('l-cam').addEventListener('click', function () {
     if (!live) return;
     var lp = live.room.localParticipant;
-    lp.setCameraEnabled(!lp.isCameraEnabled).then(function () { attachLocalVideo(live.room); updateControls(); }, function () { setWarn('Não consegui usar a câmera. Verifique a permissão do navegador.', true); });
+    var next = !lp.isCameraEnabled;
+    updateControls({ cam: next });
+    if (!next) { var me = tiles.get(snap.me.pid); if (me) me.el.classList.add('video-off'); }
+    lp.setCameraEnabled(next).then(function () { attachLocalVideo(live.room); updateControls(); }, function () { updateControls(); setWarn('Não consegui usar a câmera. Verifique a permissão do navegador.', true); });
   });
   $('l-retry').addEventListener('click', function () { if (live) enableMedia(live.room, connSeq); });
   $('l-sound').addEventListener('click', function () {
@@ -930,9 +1290,10 @@
     var el = document.createElement('div');
     el.className = 'tile ' + (prof ? 'teacher lv-misto' : (me ? 'me ' + A.LEVEL_CLS[snap.me.level] : 'lv-misto'));
     var label = prof ? 'Professor' : (me ? (name || snap.me.name) + ' (você)' : (name || '?'));
-    el.innerHTML = '<span class="avatar">' + A.esc(prof ? 'P' : A.initials(name || '?')) + '</span><video autoplay playsinline' + (me ? ' muted' : '') + '></video>' +
+    el.innerHTML = (prof ? '<span class="avatar">P</span>' : A.avatar(name || '?', id)) + '<video autoplay playsinline' + (me ? ' muted' : '') + '></video>' +
       '<span class="nm">' + A.esc(label) + '</span><span class="micoff">' + A.ICON.micoff + '</span>';
     t = { el: el, video: el.querySelector('video') };
+    if (me) bindFx(el, function () { return lobby && lobby.room; }, fxWarnLobby);
     // sem câmera ligada: começa com o ícone de microfone cortado até o aluno falar
     el.classList.add('mic-off');
     lTiles.set(id, t);
@@ -960,13 +1321,14 @@
     else t.el.classList.remove('has-video');
     var mic = room.localParticipant.getTrackPublication(LK.Track.Source.Microphone);
     t.el.classList.toggle('mic-off', !mic || mic.isMuted);
+    keepBlur(room, fxWarnLobby);
   }
-  function lobbyControls() {
+  function lobbyControls(opt) {
     var mic = $('lb-mic');
     var cam = $('lb-cam');
     var lp = lobby && lobby.room.localParticipant;
-    var micOn = !!lp && lp.isMicrophoneEnabled;
-    var camOn = !!lp && lp.isCameraEnabled;
+    var micOn = opt && opt.mic !== undefined ? opt.mic : (!!lp && lp.isMicrophoneEnabled);
+    var camOn = opt && opt.cam !== undefined ? opt.cam : (!!lp && lp.isCameraEnabled);
     if (lobby) lastMedia = { mic: micOn, cam: camOn };
     mic.innerHTML = (micOn ? A.ICON.mic : A.ICON.micoff) + 'Microfone' + sw(micOn);
     mic.setAttribute('aria-label', micOn ? 'Microfone ligado. Toque para desligar' : 'Microfone desligado. Toque para ligar');
@@ -1087,15 +1449,21 @@
     if (!lobby) return;
     var lp = lobby.room.localParticipant;
     if (!lp.isMicrophoneEnabled) stopCheck();
-    lp.setMicrophoneEnabled(!lp.isMicrophoneEnabled).then(function () { lobbyLocal(lobby.room); lobbyControls(); lobby.room.startAudio().catch(function () { /* ignorar */ }); },
-      function () { lobbyWarn('Não consegui usar o microfone. Verifique a permissão do navegador (cadeado ao lado do endereço).'); });
+    var next = !lp.isMicrophoneEnabled;
+    lobbyControls({ mic: next });
+    var mt = lTiles.get(snap.me.pid); if (mt) mt.el.classList.toggle('mic-off', !next);
+    lp.setMicrophoneEnabled(next).then(function () { lobbyLocal(lobby.room); lobbyControls(); lobby.room.startAudio().catch(function () { /* ignorar */ }); },
+      function () { lobbyControls(); lobbyWarn('Não consegui usar o microfone. Verifique a permissão do navegador (cadeado ao lado do endereço).'); });
   });
   $('lb-cam').addEventListener('click', function () {
     if (!lobby) return;
     var lp = lobby.room.localParticipant;
     if (!lp.isCameraEnabled) stopCheck();
-    lp.setCameraEnabled(!lp.isCameraEnabled).then(function () { lobbyLocal(lobby.room); lobbyControls(); },
-      function () { lobbyWarn('Não consegui usar a câmera. Verifique a permissão do navegador (cadeado ao lado do endereço).'); });
+    var next = !lp.isCameraEnabled;
+    lobbyControls({ cam: next });
+    if (!next) { var ct = lTiles.get(snap.me.pid); if (ct) ct.el.classList.add('video-off'); }
+    lp.setCameraEnabled(next).then(function () { lobbyLocal(lobby.room); lobbyControls(); },
+      function () { lobbyControls(); lobbyWarn('Não consegui usar a câmera. Verifique a permissão do navegador (cadeado ao lado do endereço).'); });
   });
   $('lb-sound').addEventListener('click', function () {
     if (lobby) lobby.room.startAudio().then(function () { $('lb-sound').hidden = lobby.room.canPlaybackAudio; }, function () { /* ignorar */ });

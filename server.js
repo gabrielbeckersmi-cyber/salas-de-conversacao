@@ -259,6 +259,25 @@ function build(env) {
     res.json({ studentId: s.id, pid: s.pid, name: s.name, level: s.level, listener: !!s.listener });
   });
 
+  // fotos de perfil: ficam só na memória do servidor (não entram no arquivo de dados); o aluno reenvia se o servidor reiniciar
+  const photos = new Map();
+  app.post('/api/classes/:id/foto', function (req, res) {
+    const c = getClass(req.params.id);
+    const s = c.students[String((req.body || {}).studentId || '')];
+    if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.');
+    const p = String((req.body || {}).photo || '');
+    if (!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(p) || p.length > 45000) throw new C.AppError(400, 'photo', 'Foto inválida.');
+    photos.set(c.id + ':' + s.pid, Buffer.from(p.split(',')[1], 'base64'));
+    s.hasPhoto = true;
+    schedule(c);
+    res.json({ ok: true });
+  });
+  app.get('/api/classes/:id/foto/:pid', function (req, res) {
+    const b = photos.get(String(req.params.id) + ':' + String(req.params.pid));
+    if (!b) return res.status(404).end();
+    res.set('Content-Type', 'image/jpeg').set('Cache-Control', 'private, max-age=3600').send(b);
+  });
+
   function chatTargets(c, roomId) {
     const r = reg(c.id);
     const out = [];
@@ -495,6 +514,15 @@ function build(env) {
       case 'answer': C.answerCall(c, b.roomId); break;
       case 'bmic': C.setBroadcastMic(c, b.roomIds); break;
       case 'allow-late': C.setAllowLate(c, b.on); break;
+      case 'mute': {   // desliga o microfone de um aluno (ele pode ligar de novo); b.pid ou b.pids
+        const r = reg(c.id);
+        (b.pids || [b.pid]).forEach(function (pid) {
+          const st = C.byPid(c, pid);
+          const set = st && r.students.get(st.id);
+          if (set) set.forEach(function (ws) { send(ws, { type: 'mute' }); });
+        });
+        break;
+      }
       case 'end-message': C.setEndMessage(c, b); break;
       case 'chat': C.teacherSay(c, b.roomIds, b.text, b.name).forEach(function (x) { sendChat(c, x.roomId, x.msg); }); break;
       case 'kick': { const s = C.kick(c, b.pid); disconnectStudent(c, s.id); break; }
@@ -554,7 +582,7 @@ function build(env) {
     if (!r.students.has(sid)) r.students.set(sid, new Set());
     r.students.get(sid).add(ws);
     C.setOnline(c, sid, true);
-    if (C.isLive(c) && !C.roomOf(c, s.pid) && !s.late) C.placeStudentLive(c, s); // quem entrou depois (liberado pelo professor) espera em "Sem sala"
+    if (C.isLive(c) && !C.roomOf(c, s.pid)) C.placeStudentLive(c, s); // quem entra depois do início vai direto para uma sala do seu nível (4 por sala; se todas estiverem cheias, a 5ª vaga)
     ws.on('close', function (code) {
       // queda de verdade (não foi o botão Sair nem fechar a página): vai para o relatório
       if ((code === 1006 || ws.hbKilled) && c.phase !== 'done' && c.students[sid]) {

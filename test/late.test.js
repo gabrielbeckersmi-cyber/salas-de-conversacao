@@ -2,21 +2,23 @@ const test = require('node:test');
 const assert = require('node:assert');
 const C = require('../lib/classes');
 
-test('permitir alunos: entrada tardia só quando liberada, cai em Sem sala', () => {
+test('entrada tardia: aluno que chega com a aula em andamento vai para sala do nível (5ª vaga se todas cheias)', () => {
   const store = {};
   const c = C.createClass(store, { title: 't', roundMinutes: 5 });
-  for (let i = 0; i < 6; i++) C.joinStudent(c, { name: 'Aluno ' + i, level: 'basico' }).online = true;
+  for (let i = 0; i < 12; i++) C.joinStudent(c, { name: 'Aluno ' + i, level: 'basico' }).online = true;
   C.startRound(c);
-  assert.throws(() => C.joinStudent(c, { name: 'Atrasado', level: 'basico' }), /já começou/);
-  C.setAllowLate(c, true);
+  c.rooms.forEach((r) => { while (r.members.length < 4) { const x = C.joinStudent(c, { name: 'Extra ' + Math.random().toString(36).slice(2, 6), level: 'basico' }); x.online = true; r.members.push(x.pid); } });
   const s = C.joinStudent(c, { name: 'Atrasado', level: 'basico' });
   assert.strictEqual(s.late, true);
-  assert.ok(!C.roomOf(c, s.pid), 'fica sem sala');
-  const room = c.rooms[0];
-  C.moveStudent(c, s.pid, room.id);
+  s.online = true;
+  assert.ok(!C.roomOf(c, s.pid));
+  const room = C.placeStudentLive(c, s);
   assert.strictEqual(C.roomOf(c, s.pid).id, room.id);
-  C.setAllowLate(c, false);
-  assert.throws(() => C.joinStudent(c, { name: 'Outro', level: 'basico' }), /já começou/);
+  assert.strictEqual(room.members.length, 5, 'salas cheias: entra como 5º');
+  const t = C.joinStudent(c, { name: 'Outro', level: 'basico' }); t.online = true;
+  const r2 = C.placeStudentLive(c, t);
+  assert.notStrictEqual(r2.id, room.id, 'prefere a sala com 4');
+  assert.strictEqual(r2.members.length, 5);
 });
 
 test('mais de 4 por sala à mão; automático respeita 4', () => {

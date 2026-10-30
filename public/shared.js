@@ -25,6 +25,29 @@ window.App = (function () {
     var p = String(name).trim().split(/\s+/);
     return ((p[0] || '?')[0] + (p[1] ? p[1][0] : '')).toUpperCase();
   }
+  // fotos de perfil: o servidor manda a lista de quem tem foto; o avatar mostra a foto no lugar das iniciais
+  var photoSet = {};
+  var photoClass = '';
+  function setPhotos(classId, list) {
+    photoClass = classId;
+    photoSet = {};
+    (list || []).forEach(function (p) { photoSet[p] = 1; });
+  }
+  function photoUrl(pid) { return photoSet[pid] ? '/api/classes/' + encodeURIComponent(photoClass) + '/foto/' + encodeURIComponent(pid) : ''; }
+  function avatar(name, pid, text) {
+    var u = photoUrl(pid);
+    if (u) return '<span class="avatar ph" data-av="' + esc(pid) + '" style="background-image:url(' + u + ')"></span>';
+    return '<span class="avatar" data-av="' + esc(pid || '') + '">' + esc(text || initials(name)) + '</span>';
+  }
+  // atualiza um avatar já desenhado (a foto pode chegar depois do quadradinho)
+  function paintAvatar(el, pid) {
+    var a = el && el.querySelector('.avatar');
+    var u = photoUrl(pid);
+    if (!a || !u || a.classList.contains('ph')) return;
+    a.classList.add('ph');
+    a.textContent = '';
+    a.style.backgroundImage = 'url(' + u + ')';
+  }
   function mmss(sec) {
     sec = Math.max(0, Math.ceil(sec));
     return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
@@ -176,5 +199,5 @@ window.App = (function () {
     return 'Faltam ' + n + (n === 1 ? ' segundo' : ' segundos') + ' ' + what;
   }
 
-  return { urgent: urgent, urgentText: urgentText, LEVEL_NAME: LEVEL_NAME, LEVEL_CLS: LEVEL_CLS, ICON: ICON, esc: esc, initials: initials, mmss: mmss, api: api, connectWS: connectWS, copyText: copyText, topctl: topctl };
+  return { urgent: urgent, urgentText: urgentText, LEVEL_NAME: LEVEL_NAME, LEVEL_CLS: LEVEL_CLS, ICON: ICON, esc: esc, initials: initials, setPhotos: setPhotos, photoUrl: photoUrl, avatar: avatar, paintAvatar: paintAvatar, mmss: mmss, api: api, connectWS: connectWS, copyText: copyText, topctl: topctl };
 })();

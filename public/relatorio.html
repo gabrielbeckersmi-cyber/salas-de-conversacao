@@ -76,7 +76,7 @@
       '<div class="stat' + (r.problems.total ? ' bad' : '') + '"><b>' + r.problems.total + '</b><span>problemas de conexão registrados</span></div></div>';
     if (T.onlyWaiting || T.late) {
       h += '<p class="note">' + (T.onlyWaiting ? T.onlyWaiting + ' aluno' + (T.onlyWaiting === 1 ? '' : 's') + ' entrou' + (T.onlyWaiting === 1 ? '' : 'ram') + ' mas ficou só na sala de espera. ' : '') +
-        (T.late ? T.late + ' entrou' + (T.late === 1 ? '' : 'ram') + ' depois do início (liberado pelo professor).' : '') + '</p>';
+        (T.late ? T.late + ' entrou' + (T.late === 1 ? '' : 'ram') + ' depois do início (entrou depois do início).' : '') + '</p>';
     }
     h += '<div class="card"><h2>Rodadas</h2><div class="scroll"><table><thead><tr><th>Rodada</th><th>Início</th><th>Fim</th><th class="n">Duração</th></tr></thead><tbody>' +
       (r.rounds.length ? r.rounds.map(function (x) { return '<tr><td>Rodada ' + x.n + '</td><td>' + dt(x.startedAt) + '</td><td>' + (x.endedAt ? dt(x.endedAt) : 'em andamento') + '</td><td class="n">' + dur(x.startedAt, x.endedAt) + '</td></tr>'; }).join('') : '<tr><td colspan="4">A primeira rodada ainda não começou.</td></tr>') +

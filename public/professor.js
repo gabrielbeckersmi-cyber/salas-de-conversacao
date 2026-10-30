@@ -164,7 +164,7 @@
     ws = A.connectWS('/ws?role=teacher&class=' + encodeURIComponent(classId) + '&token=' + encodeURIComponent(token) + '&tid=' + tid, {
       onOpen: function () { clearTimeout(netTimer); ui.fetched = -1; if (S) fetchChat(); if (ui.net) { ui.net = false; render(); } },
       onMessage: function (m) {
-        if (m.type === 'state') { S = m.data; offset = S.now - Date.now(); onState(); }
+        if (m.type === 'state') { S = m.data; A.setPhotos(classId, S.photos); offset = S.now - Date.now(); onState(); }
         else if (m.type === 'chat') addChatMsg(m.roomId, m.msg);
       },
       onClose: function (e) {
@@ -534,7 +534,7 @@
     ui.warn = '';
     return T('POST', '/api/professor/classes/' + classId + '/act', body).catch(function (e) {
       ui.warn = e.message;
-      return T('GET', '/api/professor/classes/' + classId + '?tid=' + tid).then(function (d) { S = d; offset = S.now - Date.now(); onState(); }, function () { render(); });
+      return T('GET', '/api/professor/classes/' + classId + '?tid=' + tid).then(function (d) { S = d; A.setPhotos(classId, S.photos); offset = S.now - Date.now(); onState(); }, function () { render(); });
     });
   }
   function moveLocal(pid, roomId) {
@@ -580,7 +580,7 @@
   function chipHTML(s, roomId) {
     return '<div class="pchip ' + A.LEVEL_CLS[s.level] + (s.listener ? ' ls' : '') + (s.online ? '' : ' offline') + '" draggable="true" data-pid="' + s.pid + '">' +
       (s.listener ? '<span class="lsbar">Ouvinte</span>' : '') +
-      '<span class="avatar">' + esc(A.initials(s.name)) + '</span>' +
+      A.avatar(s.name, s.pid) +
       '<span class="pn" title="' + esc(s.name) + ' (' + A.LEVEL_NAME[s.level] + ')">' + esc(s.name) + '</span>' +
       '<span class="st ' + (s.online ? 'on' : 'off') + '" title="' + (s.online ? 'online' : 'offline') + '"></span>' +
       mvSelect(s, roomId) +
@@ -590,10 +590,11 @@
   function tileHTML(r, s) {
     return '<div class="tile ' + A.LEVEL_CLS[s.level] + (s.listener ? ' ls' : '') + (s.online ? '' : ' offline') + '" draggable="true" data-pid="' + s.pid + '" data-room="' + r.id + '">' +
       (s.listener ? '<span class="lsbar">Ouvinte</span>' : '') +
-      '<span class="avatar">' + esc(A.initials(s.name)) + '</span>' +
+      A.avatar(s.name, s.pid) +
       '<span class="slot" data-room="' + r.id + '" data-pid="' + s.pid + '"></span>' +
       '<span class="nm" title="' + esc(s.name) + '">' + esc(s.name) + (s.online ? '' : ' (offline)') + '</span>' +
       '<span class="micoff">' + A.ICON.micoff + '</span>' +
+      '<button class="tilemute" data-act="mute" data-pid="' + s.pid + '" title="Desligar o microfone deste aluno" aria-label="Desligar o microfone de ' + esc(s.name) + '" type="button">' + A.ICON.micoff + '</button>' +
       mvSelect(s, r.id) +
       '<button class="kick tilekick" data-act="ask-kick" data-pid="' + s.pid + '" title="Excluir da aula" aria-label="Excluir ' + esc(s.name) + ' da aula" type="button">&times;</button></div>';
   }
@@ -638,7 +639,7 @@
       actions = '<div class="room-actions"><button class="btn btn-sm wide" data-act="remove-room" data-room="' + r.id + '" type="button">Remover sala vazia</button></div>';
     }
     return '<article class="room ' + (lvl ? A.LEVEL_CLS[lvl] : '') + (ui.joined.has(r.id) ? ' joined' : '') + (calling ? ' calling' : '') + (listening ? ' hearing' : '') + '" data-drop="' + r.id + '">' +
-      '<div class="room-head"><h3>' + 'Sala ' + r.no + '</h3><span class="badge">' + (lvl ? A.LEVEL_NAME[lvl] : 'Vazia') + ' · ' + members.length + '</span></div>' +
+      '<div class="room-head"><h3>' + 'Sala ' + r.no + '</h3>' + (live && members.length ? '<button class="btn btn-sm" data-act="mute-room" data-room="' + r.id + '" title="Desligar o microfone de todos os alunos desta sala" type="button">Mutar sala</button>' : '') + '<span class="badge">' + (lvl ? A.LEVEL_NAME[lvl] : 'Vazia') + ' · ' + members.length + '</span></div>' +
       body + (status ? '<div class="room-status">' + status + '</div>' : '') + actions + '</article>';
   }
 
@@ -651,10 +652,11 @@
   function lobbyTileHTML(s) {
     return '<div class="tile ' + A.LEVEL_CLS[s.level] + (s.listener ? ' ls' : '') + '" data-pid="' + s.pid + '" data-room="lobby">' +
       (s.listener ? '<span class="lsbar">Ouvinte</span>' : '') +
-      '<span class="avatar">' + esc(A.initials(s.name)) + '</span>' +
+      A.avatar(s.name, s.pid) +
       '<span class="slot" data-room="lobby" data-pid="' + s.pid + '"></span>' +
       '<span class="nm" title="' + esc(s.name) + '">' + esc(s.name) + '</span>' +
-      '<span class="micoff">' + A.ICON.micoff + '</span></div>';
+      '<span class="micoff">' + A.ICON.micoff + '</span>' +
+      '<button class="tilemute" data-act="mute" data-pid="' + s.pid + '" title="Desligar o microfone deste aluno" aria-label="Desligar o microfone de ' + esc(s.name) + '" type="button">' + A.ICON.micoff + '</button>' + '</div>';
   }
   function lobbyHTML() {
     var people = lobbyPeople();
@@ -738,7 +740,7 @@
       (S.rooms.length ? '<span><b>' + S.rooms.length + '</b> salas</span>' : '') +
       (unassigned.length ? '<span><b>' + unassigned.length + '</b> sem sala</span>' : '') + '</div>' +
       '<span class="actions">' +
-      (S.phase !== 'lobby' ? '<button class="btn btn-sm' + (S.allowLate ? ' on' : '') + '" data-act="allow-late" type="button" aria-pressed="' + (S.allowLate ? 'true' : 'false') + '" title="Libera a entrada de alunos atrasados. Eles esperam em Sem sala até você colocá-los em uma sala.">' + (S.allowLate ? 'Permitir alunos: ligado' : 'Permitir alunos') + '</button>' : '') +
+      '' +
       (planning || live ? '<button class="btn btn-sm" data-act="ask-end-class" type="button">Encerrar aula</button>' : '') + '</span></div>';
 
     if (ui.net) h += '<div class="msg info" role="status">Conexão instável. Reconectando…</div>';
@@ -1149,6 +1151,12 @@
     }
     if (a === 'add-room') { act({ action: 'add-room' }); return; }
     if (a === 'remove-room') { act({ action: 'remove-room', roomId: room }); return; }
+    if (a === 'mute') { act({ action: 'mute', pid: el.getAttribute('data-pid') }); return; }
+    if (a === 'mute-room') {
+      var mr = S.rooms.find(function (x) { return x.id === el.getAttribute('data-room'); });
+      if (mr) act({ action: 'mute', pids: mr.members });
+      return;
+    }
     if (a === 'ask-kick') { ui.kickPid = el.getAttribute('data-pid'); ui.confirm = 'kick'; render(); return; }
     if (a === 'sel-all') { S.rooms.forEach(function (r) { ui.sel.add(r.id); }); render(); return; }
     if (a === 'sel-none') { ui.sel.clear(); render(); return; }

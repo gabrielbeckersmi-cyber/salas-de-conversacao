@@ -112,3 +112,12 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 - Ouvinte na sala de espera: só vê quem está lá e um aviso no topo; sem jogo, sem teste de câmera, sem vídeo tutorial.
 - Quando a aula começa, o ouvinte é colocado numa sala Básica (a com menos alunos), sem aparecer para ninguém (participante oculto no LiveKit, sem publicar). Vê as pessoas e o chat, não tem botões, e mantém "Sair da aula".
 - O professor vê esses alunos com uma barra amarela "Ouvinte". Alunos não sabem que existem ouvintes. O relatório mostra "(+ N ouvintes)".
+
+## Versão de 30/10: teste antes de entrar, entrada tardia, mutar, borrar fundo, foto
+
+- **Teste antes da sala de espera:** Básico/Intermediário passam por uma tela com a câmera, seletor de câmera e "Testar microfone" (reconhecimento de voz do navegador + medidor de volume). Só depois do teste o botão "Entrar na aula" libera. Ouvinte pula o teste. Após 3 falhas é oferecido entrar como ouvinte. Problemas de permissão são avisados e o navegador pede de novo. O teste antigo da sala de espera foi escondido.
+- **Entrada tardia:** quem chega com a aula em andamento entra direto numa sala do próprio nível (prioriza salas com menos de 4; se todas estiverem cheias, vira o 5º). O professor não é avisado. O botão "Permitir alunos" foi removido.
+- **Botões de microfone/câmera** mudam na hora (sem esperar o navegador).
+- **Professor muta:** botão de microfone em cada quadradinho e "Mutar sala" no cartão da sala. O aluno pode ligar de novo.
+- **Borrar fundo:** o aluno toca na própria imagem (câmera ligada) e aparece um ícone. Usa `public/vendor/blur.js` (LiveKit track-processors + MediaPipe); o modelo e o wasm são baixados da internet (jsdelivr e storage.googleapis.com) na primeira vez.
+- **Foto de perfil:** opcional, na tela inicial; fica salva no aparelho (localStorage) e aparece no lugar das iniciais para todos, enquanto a aula durar (a foto fica só na memória do servidor).

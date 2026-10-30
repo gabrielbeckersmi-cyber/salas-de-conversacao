@@ -134,3 +134,6 @@ body.in-live .brandmark img, body.in-wait .brandmark img { height: 18px; }
 .pchip { position: relative; }
 .pchip.ls { padding-top: 14px; }
 .tile.ls .mvw, .tile.ls .tilekick { top: 20px; }
+
+/* foto de perfil no avatar */
+.avatar.ph { background-size: cover; background-position: center; background-repeat: no-repeat; color: transparent; font-size: 0; }
