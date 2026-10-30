@@ -129,12 +129,12 @@
         '<div id="set-slot"></div>' +
         (r.livekit ? '' : '<div class="msg err">O servidor ainda não tem o LiveKit configurado (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET). Sem isso a aula não consegue começar.</div>') +
         '<form class="card" id="new-class" novalidate><h2>Nova aula</h2>' +
-        '<p class="small">Cada aula tem um link só dela. Poste o link da aula de quinta para os alunos de quinta, o da sexta para os de sexta.</p>' +
+        '<p class="small">Cada aula tem um link só dela. O recado de fim de aula e o botão são copiados da aula anterior.</p>' +
         '<div class="form-row"><div class="field"><label class="lbl" for="c-title">Nome da aula</label><input class="input" id="c-title" maxlength="60" value="' + esc(def) + '"></div>' +
-        '<div class="field"><label class="lbl" for="c-min">Min. por rodada</label><input class="input" id="c-min" type="number" min="1" max="30" value="15"></div></div>' +
+        '<div class="field"><label class="lbl" for="c-min">Min. por rodada</label><input class="input" id="c-min" type="number" min="1" max="30" value="' + (r.lastMinutes || 15) + '"></div></div>' +
         '<div class="msg err" id="c-err" role="alert" hidden></div>' +
         '<div><button class="btn btn-primary" type="submit">Criar aula e gerar link</button></div></form>' +
-        '<div class="classes">' + (r.classes.length ? r.classes.map(classRow).join('') : '<p class="empty">Nenhuma aula criada ainda.</p>') + '</div>';
+        (r.classes.length ? '<h2 class="small" style="margin:18px 0 6px">Aula em andamento</h2>' : '') + '<div class="classes">' + r.classes.map(classRow).join('') + '</div>';
       mountSettings();
       $('new-class').addEventListener('submit', function (e) {
         e.preventDefault();

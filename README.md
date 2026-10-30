@@ -147,3 +147,8 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 
 - **Celular:** tocar na imagem com o desfoque ativo mostra de novo o botão para desativar.
 - **DUPLICATE_IDENTITY:** reconectar na hora derrubava a outra conexão do mesmo aluno (outra aba/aparelho ou conexão antiga) e as duas se derrubavam em vício. Agora a sala de espera não pede conexão duplicada enquanto já está conectando, e, ao receber esse motivo, a reconexão espera mais a cada vez e para depois de 3 em 1 minuto, avisando o aluno.
+
+## Versão de 30/10 (6)
+
+- **Painel do professor:** a tela inicial não lista mais aulas antigas; só o formulário "Nova aula" (e, se houver, a aula que ainda está em andamento, para não perder o acesso). Os relatórios continuam em "Relatórios".
+- **Recado de fim de aula:** texto, link e texto do botão são copiados automaticamente da aula anterior. Se mudar em uma aula, a próxima já herda a mudança. Os minutos por rodada também vêm preenchidos com o valor da última aula.

@@ -241,7 +241,7 @@ test('aula completa com 28 alunos', async function (t) {
   port = await app.listen(0);
   base = 'http://127.0.0.1:' + port;
   const list = await api('GET', '/api/professor/classes', null, T);
-  assert.strictEqual(list.json.classes.length, 2);
+  assert.strictEqual(list.json.classes.length, 1, 'só aulas em andamento aparecem na lista');
   const again = await api('GET', '/api/professor/classes/' + CID, null, T);
   assert.strictEqual(again.json.phase, 'done');
   assert.strictEqual(again.json.students.length, 29);
@@ -261,4 +261,24 @@ test('sem LiveKit configurado, iniciar a aula explica o problema', async functio
   assert.strictEqual(r.status, 500);
   assert.match(r.json.message, /LiveKit/);
   await app.close();
+});
+
+test('nova aula herda o recado de fim da aula da anterior', async function () {
+  const a = build(Object.assign({ DATA_FILE: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'em-')), 'c.json') }, ENV));
+  const p = await a.listen(0);
+  const b = 'http://127.0.0.1:' + p;
+  async function r(m, u, body, tk) {
+    const res = await fetch(b + u, { method: m, headers: Object.assign({ 'content-type': 'application/json' }, tk ? { authorization: 'Bearer ' + tk } : {}), body: body ? JSON.stringify(body) : undefined });
+    return { status: res.status, json: await res.json().catch(function () { return {}; }) };
+  }
+  try {
+    const tk = (await r('POST', '/api/professor/login', { password: ENV.PROFESSOR_PASSWORD })).json.token;
+    const c1 = (await r('POST', '/api/professor/classes', { title: 'A' }, tk)).json;
+    const act = await r('POST', '/api/professor/classes/' + c1.id + '/act', { action: 'end-message', text: 'Obrigado!', url: 'https://x.com/y', label: 'Ir' }, tk);
+    assert.strictEqual(act.status, 200);
+    const c2 = (await r('POST', '/api/professor/classes', { title: 'B' }, tk)).json;
+    const v = await r('GET', '/api/professor/classes/' + c2.id + '?tid=abcd1234', null, tk);
+    assert.strictEqual(v.json.endMessage.text, 'Obrigado!');
+    assert.strictEqual(v.json.endMessage.label, 'Ir');
+  } finally { await a.close(); }
 });

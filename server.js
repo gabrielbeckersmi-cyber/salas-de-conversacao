@@ -485,11 +485,18 @@ function build(env) {
   app.get('/api/professor/classes', needTeacher, function (req, res) {
     const list = Object.keys(store).map(function (k) { return C.summary(store[k]); })
       .sort(function (a, b) { return b.createdAt - a.createdAt; });
-    res.json({ classes: list, livekit: lkReady });
+    // o painel não mostra aulas antigas: só as que ainda estão em andamento (para o professor não perder uma aula aberta)
+    const open = list.filter(function (x) { return x.phase !== 'done'; });
+    res.json({ classes: open, lastMinutes: list.length ? list[0].roundMinutes : 15, livekit: lkReady });
   });
 
   app.post('/api/professor/classes', needTeacher, function (req, res) {
     const c = C.createClass(store, { title: req.body.title, roundMinutes: req.body.roundMinutes });
+    // recado de fim de aula (texto, link e botão) vem da aula anterior: não precisa refazer a cada aula
+    const prev = Object.keys(store).map(function (k) { return store[k]; })
+      .filter(function (x) { return x.id !== c.id; })
+      .sort(function (a, b) { return b.createdAt - a.createdAt; })[0];
+    if (prev && prev.endMessage) c.endMessage = Object.assign({}, prev.endMessage);
     save();
     res.json(C.summary(c));
   });
