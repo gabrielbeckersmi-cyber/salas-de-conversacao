@@ -19,6 +19,7 @@ function build(env) {
     lkKey: env.LIVEKIT_API_KEY || '',
     lkSecret: env.LIVEKIT_API_SECRET || '',
     password: env.PROFESSOR_PASSWORD || '',
+    dropGraceMs: Number(env.DROP_GRACE_MS || 5000),
     dataFile: env.DATA_FILE || path.join(__dirname, 'data', 'classes.json'),
     retentionDays: Number(env.RETENTION_DAYS || 30),
     reportsFile: env.REPORTS_FILE || '',
@@ -553,6 +554,8 @@ function build(env) {
     wss.handleUpgrade(req, socket, head, function (ws) { wss.emit('connection', ws, u); });
   });
 
+  const dropTimers = new Map();
+  const DROP_GRACE_MS = cfg.dropGraceMs;
   wss.on('connection', function (ws, u) {
     ws.isAlive = true;
     ws.on('pong', function () { ws.isAlive = true; });
@@ -581,17 +584,27 @@ function build(env) {
     const r = reg(c.id);
     if (!r.students.has(sid)) r.students.set(sid, new Set());
     r.students.get(sid).add(ws);
+    const dk = c.id + '|' + sid;
+    if (dropTimers.has(dk)) { clearTimeout(dropTimers.get(dk)); dropTimers.delete(dk); }   // voltou logo depois de cair: ninguém percebe
     C.setOnline(c, sid, true);
     if (C.isLive(c) && !C.roomOf(c, s.pid)) C.placeStudentLive(c, s); // quem entra depois do início vai direto para uma sala do seu nível (4 por sala; se todas estiverem cheias, a 5ª vaga)
     ws.on('close', function (code) {
-      // queda de verdade (não foi o botão Sair nem fechar a página): vai para o relatório
-      if ((code === 1006 || ws.hbKilled) && c.phase !== 'done' && c.students[sid]) {
-        noteProblem(c, ws.hbKilled ? 'aluno-timeout' : 'aluno-caiu', s.name, 8000);
-      }
+      const kind = ws.hbKilled ? 'aluno-timeout' : (code === 1006 ? 'aluno-caiu' : null);
       const set = r.students.get(sid);
       if (set) {
         set.delete(ws);
-        if (!set.size) { r.students.delete(sid); if (c.students[sid]) C.setOnline(c, sid, false); schedule(c); }
+        if (!set.size) {
+          r.students.delete(sid);
+          // oscilação de rede é comum: só considera que o aluno saiu se ele não voltar em alguns segundos
+          clearTimeout(dropTimers.get(dk));
+          dropTimers.set(dk, setTimeout(function () {
+            dropTimers.delete(dk);
+            if (r.students.has(sid)) return;
+            if (kind && c.phase !== 'done' && c.students[sid]) noteProblem(c, kind, s.name, 8000);   // queda de verdade: vai para o relatório
+            if (c.students[sid]) C.setOnline(c, sid, false);
+            schedule(c);
+          }, DROP_GRACE_MS));
+        }
       }
     });
     studentSnapshot(c, s).then(function (snap) { send(ws, { type: 'state', data: snap }); });

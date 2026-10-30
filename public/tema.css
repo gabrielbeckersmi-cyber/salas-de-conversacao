@@ -137,3 +137,7 @@ body.in-live .brandmark img, body.in-wait .brandmark img { height: 18px; }
 
 /* foto de perfil no avatar */
 .avatar.ph { background-size: cover; background-position: center; background-repeat: no-repeat; color: transparent; font-size: 0; }
+.lv-ouv { --lvl: #b88600; --lvl-bg: #fff1cf; }
+.btn-yellow { background: #ffc800; color: #4a3200; border-color: #d9a400; box-shadow: 0 4px 0 #c79300; }
+.btn-yellow:hover:not(:disabled) { background: #ffd333; }
+.btn-yellow:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #c79300; }

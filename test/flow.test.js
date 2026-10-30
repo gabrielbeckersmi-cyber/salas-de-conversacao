@@ -14,7 +14,8 @@ const ENV = {
   LIVEKIT_URL: 'wss://exemplo.livekit.cloud',
   LIVEKIT_API_KEY: 'APIkeyTeste',
   LIVEKIT_API_SECRET: SECRET,
-  PROFESSOR_PASSWORD: 'senha-do-professor'
+  PROFESSOR_PASSWORD: 'senha-do-professor',
+  DROP_GRACE_MS: '150'
 };
 const DATA = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'salas-')), 'classes.json');
 

@@ -213,6 +213,52 @@
   // ---------- teste de câmera e microfone antes de entrar ----------
   var preCtl = null;
   function stopPre() { if (preCtl) { preCtl.stop(); preCtl = null; } }
+  // ---------- como liberar câmera e microfone, de acordo com o navegador ----------
+  function permGuide() {
+    var ua = navigator.userAgent || '';
+    var ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var android = /Android/i.test(ua);
+    var inapp = /FBAN|FBAV|Instagram|Line\/|MicroMessenger|TikTok|musical_ly|Snapchat|Twitter|LinkedInApp|Pinterest|; wv\)/i.test(ua);
+    var br = /EdgA|EdgiOS|Edg\//.test(ua) ? 'edge' : /OPR\/|OPiOS|OPT\//.test(ua) ? 'opera' : /SamsungBrowser/.test(ua) ? 'samsung' : /FxiOS|Firefox/.test(ua) ? 'firefox' : /CriOS|Chrome\//.test(ua) ? 'chrome' : /Safari/.test(ua) ? 'safari' : 'outro';
+    var mac = /Macintosh/.test(ua) && !ios;
+    var win = /Windows/.test(ua);
+    var name = { edge: 'Microsoft Edge', opera: 'Opera', samsung: 'Samsung Internet', firefox: 'Firefox', chrome: 'Google Chrome', safari: 'Safari', outro: 'seu navegador' }[br];
+    var steps;
+    if (inapp) {
+      return { title: 'Abra a aula no navegador', steps: ['Você abriu o link dentro de outro aplicativo (Instagram, Facebook, TikTok…), que costuma bloquear câmera e microfone.',
+        'Toque no menu (⋯ ou ⋮) e escolha "Abrir no navegador", "Abrir no Chrome" ou "Abrir no Safari".', 'Se preferir, copie o link e cole no Chrome (Android) ou no Safari (iPhone).'] };
+    }
+    if (ios) {
+      if (br === 'safari') {
+        steps = ['Toque em "aA" no canto esquerdo da barra de endereço.', 'Toque em "Ajustes do Site" (ou "Configurações do Site").', 'Em Câmera e em Microfone, escolha "Permitir".', 'Volte e recarregue a página.',
+          'Se não aparecer: abra o app Ajustes do iPhone, toque em Safari (em versões novas: Apps › Safari), depois em Câmera e Microfone e escolha "Perguntar" ou "Permitir".'];
+      } else {
+        steps = ['Abra o app Ajustes do iPhone.', 'Role até encontrar "' + (br === 'chrome' ? 'Chrome' : br === 'firefox' ? 'Firefox' : br === 'edge' ? 'Edge' : 'o seu navegador') + '" (em versões novas: Apps › ' + (br === 'chrome' ? 'Chrome' : 'o navegador') + ').', 'Ative os botões "Microfone" e "Câmera".', 'Volte para a aula e recarregue a página.',
+          'Dica: no iPhone o Safari costuma funcionar melhor para aulas por vídeo.'];
+      }
+      return { title: 'Como liberar no ' + name + ' (iPhone)', steps: steps };
+    }
+    if (android) {
+      var sys = 'Se ainda não funcionar: Configurações do Android › Apps › ' + name + ' › Permissões › Câmera e Microfone › "Permitir somente com o app em uso".';
+      if (br === 'samsung') steps = ['Toque no ícone à esquerda do endereço (cadeado) e depois em "Permissões".', 'Ative Câmera e Microfone.', 'Se não aparecer: toque no menu ≡ › Configurações › Sites e downloads › Permissões do site › Câmera / Microfone, e permita este site.', 'Recarregue a página.', sys];
+      else if (br === 'firefox') steps = ['Toque no cadeado à esquerda do endereço.', 'Toque em "Permissões do site" (ou "Editar configurações do site").', 'Em Câmera e Microfone, escolha "Permitir".', 'Recarregue a página.', sys];
+      else if (br === 'edge') steps = ['Toque no cadeado à esquerda do endereço e depois em "Permissões".', 'Em Câmera e Microfone, escolha "Permitir".', 'Recarregue a página.', sys];
+      else steps = ['Toque no ícone à esquerda do endereço (cadeado ou ajustes) e depois em "Permissões".', 'Em Câmera e Microfone, escolha "Permitir".', 'Se não aparecer: toque nos três pontinhos ⋮ › Configurações › Configurações do site › Microfone (e Câmera) e veja se este site está em "Bloqueado".', 'Recarregue a página.', sys];
+      return { title: 'Como liberar no ' + name + ' (Android)', steps: steps };
+    }
+    // computador
+    if (br === 'safari' && mac) steps = ['No menu Safari (barra do topo), clique em "Ajustes para Este Site…".', 'Em Câmera e Microfone, escolha "Permitir".', 'Recarregue a página.', 'Se ainda não funcionar: Ajustes do Sistema › Privacidade e Segurança › Câmera e Microfone, e ative o Safari.'];
+    else if (br === 'firefox') steps = ['Clique no ícone de permissões à esquerda do endereço.', 'Ao lado de "Bloqueado" (Câmera ou Microfone), clique no X.', 'Recarregue a página e clique em "Permitir" quando o navegador perguntar.'];
+    else steps = ['Clique no ícone à esquerda do endereço (cadeado ou ajustes).', 'Em Câmera e em Microfone, mude de "Bloquear" para "Permitir"' + (br === 'edge' ? ' (em "Permissões para este site").' : '.'), 'Clique em "Recarregar" (ou aperte F5).'];
+    if (win) steps.push('Se ainda não funcionar: Configurações do Windows › Privacidade e segurança › Microfone (e Câmera) e deixe ligado "Permitir que aplicativos acessem".');
+    if (br === 'chrome' && !mac) steps.push('Dica: você também pode colar chrome://settings/content/microphone na barra de endereço e remover este site da lista "Bloqueado".');
+    return { title: 'Como liberar no ' + name, steps: steps };
+  }
+  function permGuideHTML() {
+    var g = permGuide();
+    return '<div class="pre-guide"><h3>' + A.esc(g.title) + '</h3><ol>' + g.steps.map(function (t) { return '<li>' + A.esc(t) + '</li>'; }).join('') + '</ol></div>';
+  }
+
   function screenPre(name, level) {
     stopPre();
     var stream = null, ctx = null, raf = 0, micOk = false, attempts = 0, pop = null, rec = null, testTimer = null, testing = false;
@@ -220,9 +266,9 @@
       '<div class="pre-cam"><video id="pre-video" autoplay muted playsinline></video><div class="pre-novideo" id="pre-novideo" hidden>Câmera indisponível</div></div>' +
       '<p class="small pre-help">A câmera não funciona? Tente apertar no botão abaixo e selecionar outra.</p>' +
       '<select class="input" id="pre-cam" aria-label="Escolher câmera"></select>' +
-      '<div class="msg err" id="pre-perm" role="alert" hidden><span id="pre-perm-txt"></span> <button class="btn btn-sm" id="pre-perm-btn" type="button">Permitir</button></div>' +
+      '<div class="msg err" id="pre-perm" role="alert" hidden><span id="pre-perm-txt"></span> <button class="btn btn-sm" id="pre-perm-btn" type="button">Permitir</button><div id="pre-perm-guide"></div></div>' +
       '<div class="msg err" id="pre-err" role="alert" hidden></div>' +
-      '<button class="btn btn-primary blink" id="pre-mic" type="button">Testar microfone</button>' +
+      '<button class="btn btn-yellow blink" id="pre-mic" type="button">Testar microfone</button>' +
       '<button class="btn" id="pre-go" type="button" disabled>Teste seu microfone antes de entrar</button>' +
       '<button class="linkbtn dim" id="pre-back" type="button">← Voltar</button>' +
       '</div>');
@@ -246,9 +292,9 @@
     function paintButtons() {
       var m = $('pre-mic'), g = $('pre-go');
       if (!m || !g) return;
-      m.classList.toggle('blink', !micOk);
+      m.className = 'btn' + (micOk ? '' : ' btn-yellow blink');
       g.disabled = !micOk;
-      g.className = 'btn' + (micOk ? ' btn-primary go-ready' : '');
+      g.className = 'btn' + (micOk ? ' btn-yellow go-ready' : '');
       g.textContent = micOk ? 'Entrar na aula' : 'Teste seu microfone antes de entrar';
     }
     function showPerm() {
@@ -257,8 +303,9 @@
         if (!$('pre-perm')) return;
         var denied = st === 'denied';
         $('pre-perm-txt').textContent = denied
-          ? 'O navegador está bloqueando a câmera e o microfone. Toque no cadeado ao lado do endereço, permita Câmera e Microfone e depois toque em "Tentar de novo". Se não resolver, recarregue a página.'
+          ? 'O navegador está bloqueando a câmera e o microfone. Siga os passos abaixo e depois toque em "Tentar de novo".'
           : 'Precisamos da sua permissão para usar a câmera e o microfone. Toque no botão e escolha "Permitir".';
+        $('pre-perm-guide').innerHTML = permGuideHTML();
         $('pre-perm-btn').textContent = denied ? 'Tentar de novo' : 'Permitir';
         $('pre-perm').hidden = false;
       });
@@ -336,8 +383,9 @@
       if (!track || track.readyState !== 'live') { open().then(function () { if (stream && stream.getAudioTracks()[0]) runTest(); }); return; }
       stopListen();
       testing = true;
-      openPop('<h2>Fale algo para testar seu microfone</h2><div class="meter" aria-hidden="true"><i id="pp-meter"></i></div><p class="small" id="pp-heard">&nbsp;</p>');
-      var maxPeak = 0, hits = 0, sttErr = '';
+      openPop('<h2>Fale algo para testar seu microfone</h2><div class="meter pre-meter" aria-hidden="true"><i id="pp-meter"></i></div><p class="small">Fale normalmente até a barra passar da marca do meio.</p><p class="small" id="pp-heard">&nbsp;</p>');
+      var maxLevel = 0, level = 0, since = 0, sttErr = '', haveAnalyser = false;
+      var NEED = 0.192;   // mais da metade da barra (a barra mostra nível × 2,6)
       var AC = window.AudioContext || window.webkitAudioContext;
       if (AC) {
         try {
@@ -347,19 +395,21 @@
           an.fftSize = 512;
           ctx.createMediaStreamSource(new MediaStream([track])).connect(an);
           var buf = new Uint8Array(an.fftSize);
+          haveAnalyser = true;
           var tick = function () {
             if (!testing) return;
             an.getByteTimeDomainData(buf);
             var peak = 0;
             for (var i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i] - 128) / 128);
-            maxPeak = Math.max(maxPeak, peak);
-            var m = $('pp-meter'); if (m) m.style.width = Math.min(100, peak * 260) + '%';
-            if (peak > 0.1) hits++;   // soma os instantes de voz; ruído ambiente fica abaixo disso
-            if (hits >= 3) { success(); return; }
+            level = Math.max(peak, level * 0.85);   // sobe na hora e desce devagar: um estalo isolado (mexer no cabo) some em ~0,2 s
+            maxLevel = Math.max(maxLevel, level);
+            var m = $('pp-meter'); if (m) m.style.width = Math.min(100, level * 260) + '%';
+            var now = performance.now();
+            if (level > NEED) { if (!since) since = now; if (now - since >= 500) { success(); return; } } else since = 0;   // precisa se manter acima da metade por 0,5 s, como fala de verdade
             raf = requestAnimationFrame(tick);
           };
           tick();
-        } catch (e) { /* sem medidor: só o reconhecimento de voz */ }
+        } catch (e) { haveAnalyser = false; }
       }
       var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SR) {
@@ -372,13 +422,13 @@
             var t = '';
             for (var i = ev.resultIndex; i < ev.results.length; i++) t += ev.results[i][0].transcript;
             t = t.trim();
-            if (t) { var h = $('pp-heard'); if (h) h.textContent = '“' + t + '”'; success(); }
+            if (t) { var h = $('pp-heard'); if (h) h.textContent = '“' + t + '”'; if (!haveAnalyser) success(); }   // sem medidor de volume, vale o reconhecimento de voz
           };
           rec.onerror = function (ev) { sttErr = ev && ev.error || ''; };
           rec.start();
         } catch (e) { rec = null; }
       }
-      testTimer = setTimeout(function () { if (testing) fail(maxPeak, sttErr); }, 3000);
+      testTimer = setTimeout(function () { if (testing) fail(maxLevel, sttErr); }, 3000);
     }
     function success() {
       if (!testing) return;
@@ -389,11 +439,11 @@
       openPop('<div class="okpop"><svg viewBox="0 0 52 52" width="72" height="72" aria-hidden="true"><circle cx="26" cy="26" r="24" fill="none" stroke="#2fb457" stroke-width="3"/><path d="M14 27l8 8 16-17" fill="none" stroke="#2fb457" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><h2>Seu microfone está funcionando!</h2></div>');
       setTimeout(closePop, 1300);
     }
-    function fail(maxPeak, sttErr) {
+    function fail(maxLevel, sttErr) {
       stopListen();
       var track = stream && stream.getAudioTracks()[0];
       micPerm().then(function (st) {
-        var permProblem = st !== 'granted' || !track || track.readyState !== 'live' || sttErr === 'not-allowed' || sttErr === 'service-not-allowed' && maxPeak === 0;
+        var permProblem = st !== 'granted' || !track || track.readyState !== 'live' || sttErr === 'not-allowed' || sttErr === 'service-not-allowed' && maxLevel === 0;
         if (permProblem && (st !== 'granted' || !track || track.readyState !== 'live')) {
           closePop();
           showPerm();
@@ -401,7 +451,12 @@
         }
         attempts++;
         if (attempts >= 3) { showListenerOffer(); return; }
-        openPop('<h2>Não consegui ouvir</h2><p>Não consegui ouvir, tente de novo ou experimente selecionar outro microfone</p>' +
+        var blip = maxLevel > 0.192;   // chegou um pico forte, mas não se manteve como voz (estalo, cabo)
+        var low = !blip && maxLevel >= 0.06;   // chegou som, mas fraco
+        openPop('<h2>' + (blip ? 'Só ouvi um ruído' : low ? 'Som muito baixo' : 'Não consegui ouvir') + '</h2>' +
+          (blip ? '<p class="pre-lowmsg">Captei só um ruído rápido, não uma voz. Fale normalmente por alguns segundos e tente de novo.</p>'
+          : low ? '<p class="pre-lowmsg">Seu microfone está captando som, mas muito baixo. Fale mais perto do microfone ou mais alto e tente de novo.</p><p>Se continuar baixo, experimente selecionar outro microfone.</p>'
+               : '<p>Não consegui ouvir, tente de novo ou experimente selecionar outro microfone</p>') +
           '<div id="pp-micwrap" hidden><select class="input" id="pp-mic" aria-label="Escolher microfone"></select></div>' +
           '<div class="tut-foot"><button class="btn" id="pp-switch" type="button">Trocar de microfone</button><button class="btn btn-primary" id="pp-retry" type="button">Tentar de novo</button></div>');
         $('pp-retry').addEventListener('click', function () { closePop(); runTest(); });

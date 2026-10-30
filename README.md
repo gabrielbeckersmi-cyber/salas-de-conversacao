@@ -121,3 +121,11 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 - **Professor muta:** botão de microfone em cada quadradinho e "Mutar sala" no cartão da sala. O aluno pode ligar de novo.
 - **Borrar fundo:** o aluno toca na própria imagem (câmera ligada) e aparece um ícone. Usa `public/vendor/blur.js` (LiveKit track-processors + MediaPipe); o modelo e o wasm são baixados da internet (jsdelivr e storage.googleapis.com) na primeira vez.
 - **Foto de perfil:** opcional, na tela inicial; fica salva no aparelho (localStorage) e aparece no lugar das iniciais para todos, enquanto a aula durar (a foto fica só na memória do servidor).
+
+## Versão de 30/10 (2)
+
+- Painel e relatório mostram o número de ouvintes (o painel não conta mais o ouvinte como Básico).
+- **Quedas rápidas:** o servidor só considera que o aluno saiu se ele não reconectar em 5 s (`DROP_GRACE_MS`, em ms). Oscilações curtas de rede não piscam como "offline" nem entram no relatório.
+- **Teste de microfone:** precisa passar da metade da barra e se manter por 0,5 s. Estalo isolado não vale. Som fraco mostra "muito baixo". Botões "Testar microfone" (piscando) e "Entrar na aula" em amarelo.
+- **Borrar fundo:** o ícone aparece no centro da câmera do aluno.
+- **Permissão negada:** passo a passo específico para o navegador (Chrome, Safari, Samsung Internet, Firefox, Edge; iPhone, Android e computador) e aviso para sair de navegadores dentro de aplicativos (Instagram, Facebook…).

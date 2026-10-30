@@ -725,8 +725,8 @@
     var planning = isPlanning();
     var url = location.origin + '/aula/' + S.id;
     var online = S.students.filter(function (s) { return s.online; }).length;
-    var counts = { basico: 0, intermediario: 0 };
-    S.students.forEach(function (s) { counts[s.level]++; });
+    var counts = { basico: 0, intermediario: 0, ouvinte: 0 };
+    S.students.forEach(function (s) { counts[s.listener ? 'ouvinte' : s.level]++; });
 
     var main = { lobby: ['Iniciar aula', 'start'], between: ['Iniciar rodada 2', 'start'], r1: ['Encerrar rodada 1', 'end-round'], r2: ['Encerrar rodada 2', 'end-round'], closing: ['Encerrar a aula', 'end-class'] }[S.phase];
     var h = '<header class="topbar"><div><p class="small"><a href="/professor">&larr; Aulas</a></p><h1>' + esc(S.title) + '</h1>' +
@@ -737,6 +737,7 @@
     h += '<div class="statsrow"><div class="stats"><span><b>' + S.students.length + '</b> alunos (' + online + ' online)</span>' +
       '<span class="lv-basico"><i class="dot"></i><b>' + counts.basico + '</b> Básico</span>' +
       '<span class="lv-inter"><i class="dot"></i><b>' + counts.intermediario + '</b> Intermediário</span>' +
+      '<span class="lv-ouv"><i class="dot"></i><b>' + counts.ouvinte + '</b> Ouvinte' + (counts.ouvinte === 1 ? '' : 's') + '</span>' +
       (S.rooms.length ? '<span><b>' + S.rooms.length + '</b> salas</span>' : '') +
       (unassigned.length ? '<span><b>' + unassigned.length + '</b> sem sala</span>' : '') + '</div>' +
       '<span class="actions">' +
