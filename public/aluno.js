@@ -31,9 +31,14 @@
   var conn = null;
   function isProf(id) { return /^prof-/.test(String(id)); }
   // avisa o servidor de problemas de conexão de vídeo (entram no relatório da aula)
-  function reportProblem(kind) {
+  function reportProblem(kind, detail) {
     if (!session) return;
-    A.api('POST', '/api/classes/' + encodeURIComponent(classId) + '/problem', { studentId: session.studentId, kind: kind }).catch(function () { /* ignorar */ });
+    A.api('POST', '/api/classes/' + encodeURIComponent(classId) + '/problem', { studentId: session.studentId, kind: kind, detail: detail || '' }).catch(function () { /* ignorar */ });
+  }
+  // motivo da queda informado pelo LiveKit (vai para o relatório, para descobrirmos a causa)
+  function discReason(r) {
+    try { var names = LK.DisconnectReason || {}; for (var k in names) { if (names[k] === r && isNaN(Number(k))) return k; } } catch (e) { /* ignorar */ }
+    return r === undefined ? '' : 'motivo ' + r;
   }
   function watchHealth(room, current) {
     var E = LK.RoomEvent;
@@ -402,16 +407,16 @@
             an.getByteTimeDomainData(buf);
             var peak = 0;
             for (var i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i] - 128) / 128);
-            level = Math.max(peak, level * 0.8);   // sobe na hora e desce rápido
+            level = Math.max(peak, level * 0.7);   // sobe na hora e desce rápido (um estalo de cabo some em ~0,1 s)
             maxLevel = Math.max(maxLevel, level);
             var m = $('pp-meter'); if (m) m.style.width = Math.min(100, level / (NEED * 2) * 100) + '%';
             var now = performance.now();
             var dt = lastT ? Math.min(100, now - lastT) : 0;
             lastT = now;
             if (level > NEED) { voiced += dt; if (!firstV) firstV = now; lastV = now; }
-            // fala de verdade: soma pelo menos 0,6 s acima do mínimo, espalhada por 0,8 s ou mais (a fala sobe e desce, então não precisa ser contínua).
+            // fala de verdade: soma pelo menos 0,3 s acima do mínimo, espalhada por 0,4 s ou mais (a fala sobe e desce, então não precisa ser contínua).
             // Um estalo de cabo dura poucos centésimos de segundo e não chega nisso.
-            if (voiced >= 600 && lastV - firstV >= 800) { success(); return; }
+            if (voiced >= 300 && lastV - firstV >= 400) { success(); return; }
             raf = requestAnimationFrame(tick);
           };
           tick();
@@ -532,6 +537,7 @@
     } else if (m.type === 'dyn') {
       if (snap && snap.room && m.roomId === snap.room.id) dynSet(m.data);
     } else if (m.type === 'mute') {
+      wantSet(false, undefined);
       if (live && live.room.localParticipant.isMicrophoneEnabled) {
         live.room.localParticipant.setMicrophoneEnabled(false).then(function () { attachLocalVideo(live.room); updateControls(); });
         updateControls({ mic: false });
@@ -1005,21 +1011,37 @@
     var pub = room && room.localParticipant.getTrackPublication(LK.Track.Source.Camera);
     return pub && pub.track ? pub.track : null;
   }
+  var blurBusy = null;      // promessa em andamento: nunca duas ao mesmo tempo (várias cópias do modelo travam o computador)
+  var blurTimer = null;
   function applyBlur(room, on) {
     var track = camTrackOf(room);
     if (!track) return Promise.resolve();
-    var has = track.getProcessor && track.getProcessor();
-    if (!on) return has ? track.stopProcessor() : Promise.resolve();
-    if (has) return Promise.resolve();
-    return loadBlurLib().then(function () {
-      if (!window.LKBlur.supported()) throw new Error('unsupported');
-      return track.setProcessor(window.LKBlur.BackgroundProcessor({ mode: 'background-blur', blurRadius: 12 }));
-    });
+    var has = !!(track.getProcessor && track.getProcessor());
+    if (has === on) return Promise.resolve();
+    if (blurBusy) return blurBusy.then(function () { return applyBlur(room, on); }, function () { return applyBlur(room, on); });
+    var job = on
+      ? loadBlurLib().then(function () {
+          if (!window.LKBlur.supported()) throw new Error('unsupported');
+          return track.setProcessor(window.LKBlur.BackgroundProcessor({ mode: 'background-blur', blurRadius: 10 }));
+        })
+      : track.stopProcessor();
+    blurBusy = Promise.resolve(job).then(function () { blurBusy = null; }, function (e) { blurBusy = null; throw e; });
+    return blurBusy;
   }
-  // reaplica o efeito quando a câmera é ligada de novo ou o aluno troca de sala
+  // ao entrar numa sala nova, reaplica o efeito só depois de alguns segundos (a entrada em sala já é pesada) e uma vez só
   function keepBlur(room, warn) {
-    if (!wantBlur) return;
-    applyBlur(room, true).catch(function () { wantBlur = false; paintFx(); warn(); });
+    if (!wantBlur || blurTimer || blurBusy) return;
+    var track = camTrackOf(room);
+    if (!track || (track.getProcessor && track.getProcessor())) return;
+    blurTimer = setTimeout(function () {
+      blurTimer = null;
+      if (!wantBlur) return;
+      applyBlur(room, true).catch(function () { wantBlur = false; paintFx(); warn(); });
+    }, 3000);
+  }
+  function dropBlur(room) {   // antes de sair de uma sala: solta o processamento de vídeo
+    clearTimeout(blurTimer); blurTimer = null;
+    try { var t = camTrackOf(room); if (t && t.getProcessor && t.getProcessor()) t.stopProcessor(); } catch (e) { /* ignorar */ }
   }
   function paintFx() {
     document.querySelectorAll('.tile .fxbtn').forEach(function (b) { b.classList.toggle('on', wantBlur); b.setAttribute('aria-pressed', String(wantBlur)); });
@@ -1034,12 +1056,14 @@
     b.innerHTML = FX_ICON;
     el.appendChild(b);
     var hideT = null;
+    // computador: o botão aparece ao passar o mouse (CSS). Celular: toque na imagem mostra por 1 s e some com fade.
     el.addEventListener('click', function (e) {
       if (e.target.closest && e.target.closest('.fxbtn')) return;
-      el.classList.toggle('fx-open');
+      el.classList.add('fx-open');
       clearTimeout(hideT);
-      if (el.classList.contains('fx-open')) hideT = setTimeout(function () { el.classList.remove('fx-open'); }, 5000);
+      hideT = setTimeout(function () { el.classList.remove('fx-open'); }, 1000);
     });
+    el.addEventListener('mouseleave', function () { el.classList.remove('fx-hide'); });
     b.addEventListener('click', function () {
       var room = getRoom();
       if (!room) return;
@@ -1047,18 +1071,55 @@
       paintFx();
       applyBlur(room, wantBlur).catch(function () { wantBlur = false; paintFx(); warn(); });
       clearTimeout(hideT);
-      hideT = setTimeout(function () { el.classList.remove('fx-open'); }, 3000);
+      el.classList.remove('fx-open');
+      el.classList.add('fx-hide');   // ao ligar/desligar o botão some (volta ao passar o mouse de novo ou tocar na imagem)
+      setTimeout(function () { if (!el.matches(':hover')) el.classList.remove('fx-hide'); }, 600);
     });
     paintFx();
   }
   function fxWarnLive() { setWarn('Não consegui borrar o fundo neste aparelho ou navegador.', false); setTimeout(function () { if (live) setWarn(null); }, 6000); }
   function fxWarnLobby() { lobbyWarn('Não consegui borrar o fundo neste aparelho ou navegador.'); setTimeout(function () { lobbyWarn(null); }, 6000); }
 
+  // ---------- religa câmera e microfone que desligarem sozinhos ----------
+  var wantMedia = { mic: false, cam: false };   // o que o aluno pediu (botões); o vigia religa se o navegador/rede desligar sem ele pedir
+  var lastToggleAt = 0;
+  var healFails = { mic: 0, cam: 0 };
+  function wantSet(mic, cam) {
+    lastToggleAt = Date.now();
+    if (mic !== undefined) { wantMedia.mic = mic; healFails.mic = 0; }
+    if (cam !== undefined) { wantMedia.cam = cam; healFails.cam = 0; }
+  }
+  function healMedia() {
+    if (document.hidden || (snap && snap.me && snap.me.listener)) return;
+    if (Date.now() - lastToggleAt < 6000) return;
+    var room = live ? live.room : (lobby ? lobby.room : null);
+    if (!room || room.state !== 'connected') return;
+    var lp = room.localParticipant;
+    var did = [];
+    var jobs = [];
+    if (wantMedia.mic && !lp.isMicrophoneEnabled && healFails.mic < 3) {
+      did.push('microfone');
+      jobs.push(lp.setMicrophoneEnabled(true).then(function () { healFails.mic = 0; }, function () { healFails.mic++; }));
+    }
+    if (wantMedia.cam && !lp.isCameraEnabled && healFails.cam < 3) {
+      did.push('camera');
+      jobs.push(lp.setCameraEnabled(true).then(function () { healFails.cam = 0; }, function () { healFails.cam++; }));
+    }
+    if (!jobs.length) return;
+    reportProblem('midia-religada', did.join('+'));
+    Promise.all(jobs).then(function () {
+      if (live && live.room === room) { attachLocalVideo(room); updateControls(); }
+      else if (lobby && lobby.room === room) { lobbyLocal(room); lobbyControls(); }
+    });
+  }
+  setInterval(healMedia, 2500);
+
   // estado de microfone e câmera que o aluno estava usando: segue com ele entre sala de espera e salas
   var lastMedia = null;
   function applyMedia(room, onErr) {
     var lp = room.localParticipant;
     var m = lastMedia || { mic: false, cam: false };
+    wantSet(m.mic, m.cam);
     var micErr = null, camErr = null;
     return (m.mic ? lp.setMicrophoneEnabled(true).catch(function (e) { micErr = e; }) : Promise.resolve())
       .then(function () { return m.cam ? lp.setCameraEnabled(true).catch(function (e) { camErr = e; }) : null; })
@@ -1120,12 +1181,12 @@
       setStatus(st === 'reconnecting' || st === 'signalReconnecting' ? 'Reconectando à sala…' : '');
     });
     room.on(E.LocalTrackPublished, function () { attachLocalVideo(room); updateControls(); });
-    room.on(E.Disconnected, function () {
+    room.on(E.Disconnected, function (reason) {
       if (seq !== connSeq || !live || live.room !== room) return;
       live = null;
-      reportProblem('video-caiu');
+      reportProblem('video-caiu', discReason(reason));
       setWarn('Você foi desconectado da sala de vídeo. Reconectando…', false);
-      retryTimer = setTimeout(function () { if (snap && snap.room && snap.room.lk) startLive(snap.room.lk); }, 2000);
+      retryTimer = setTimeout(function () { if (snap && snap.room && snap.room.lk) startLive(snap.room.lk); }, 700);
     });
   }
 
@@ -1138,7 +1199,7 @@
   function startLive(lk) {
     var seq = ++connSeq;
     clearTimeout(retryTimer);
-    if (live) { var old = live.room; live = null; try { old.disconnect(); } catch (e) { /* ignorar */ } }
+    if (live) { var old = live.room; live = null; dropBlur(old); try { old.disconnect(); } catch (e) { /* ignorar */ } }
     clearTiles();
     hideScreen();
     return bestDevices().then(function (d) {
@@ -1183,6 +1244,7 @@
     var micErr = null;
     var camErr = null;
     var want = lastMedia || { mic: true, cam: true };   // sem histórico (entrou direto na sala): liga os dois
+    wantSet(want.mic, want.cam);
     return (want.mic ? room.localParticipant.setMicrophoneEnabled(true).catch(function (e) { micErr = e; }) : Promise.resolve())
       .then(function () { return want.cam ? room.localParticipant.setCameraEnabled(true).catch(function (e) { camErr = e; }) : null; })
       .then(function () {
@@ -1230,6 +1292,8 @@
     clearTimeout(retryTimer);
     if (live) {
       var r = live.room; live = null;
+      dropBlur(r);
+      wantSet(false, undefined);
       if (lastMedia) lastMedia = { mic: false, cam: lastMedia.cam };   // volta para a sala de espera com o microfone desligado; a câmera fica como estava
       try { r.disconnect(); } catch (e) { /* ignorar */ }
     }
@@ -1298,6 +1362,7 @@
     if (!live) return;
     var lp = live.room.localParticipant;
     var next = !lp.isMicrophoneEnabled;
+    wantSet(next, undefined);
     updateControls({ mic: next });
     var me = tiles.get(snap.me.pid); if (me) me.el.classList.toggle('mic-off', !next);
     lp.setMicrophoneEnabled(next).then(function () { attachLocalVideo(live.room); updateControls(); }, function () { updateControls(); setWarn('Não consegui usar o microfone. Verifique a permissão do navegador.', true); });
@@ -1306,6 +1371,7 @@
     if (!live) return;
     var lp = live.room.localParticipant;
     var next = !lp.isCameraEnabled;
+    wantSet(undefined, next);
     updateControls({ cam: next });
     if (!next) { var me = tiles.get(snap.me.pid); if (me) me.el.classList.add('video-off'); }
     lp.setCameraEnabled(next).then(function () { attachLocalVideo(live.room); updateControls(); }, function () { updateControls(); setWarn('Não consegui usar a câmera. Verifique a permissão do navegador.', true); });
@@ -1336,7 +1402,24 @@
       if (h * rows + gap * (rows - 1) > H) { h = (H - gap * (rows - 1)) / rows; w = h * 4 / 3; }
       if (w > best) { best = w; bc = c; }
     }
-    best = Math.max(40, Math.min(best, 300));
+    // computador (sala de espera): as câmeras esticam e preenchem todo o lado esquerdo, sem sobrar faixas vazias
+    if (window.matchMedia && window.matchMedia('(min-width: 900px) and (min-height: 560px)').matches && document.body.classList.contains('in-wait')) {
+      var fb = null;
+      for (var c2 = 1; c2 <= n; c2++) {
+        var r2 = Math.ceil(n / c2);
+        var cw = (W - gap * (c2 - 1)) / c2, ch = (H - gap * (r2 - 1)) / r2;
+        var score = Math.abs(Math.log((cw / ch) / (4 / 3)));
+        if (!fb || score < fb.score) fb = { c: c2, r: r2, w: cw, h: ch, score: score };
+      }
+      if (fb && fb.w <= 520 && fb.h <= 400) {
+        el.style.gridTemplateColumns = 'repeat(' + fb.c + ', minmax(0, 1fr))';
+        el.style.gridTemplateRows = 'repeat(' + fb.r + ', minmax(0, 1fr))';
+        el.style.gridAutoRows = '';
+        return;
+      }
+    }
+    el.style.gridTemplateRows = '';
+    best = Math.max(40, Math.min(best, 520));
     el.style.gridTemplateColumns = 'repeat(' + bc + ', ' + Math.floor(best) + 'px)';
     el.style.gridAutoRows = Math.floor(best * 3 / 4) + 'px';
   }
@@ -1433,12 +1516,12 @@
     room.on(E.AudioPlaybackStatusChanged, function () { $('lb-sound').hidden = room.canPlaybackAudio; });
     room.on(E.LocalTrackPublished, function () { lobbyLocal(room); lobbyControls(); });
     room.on(E.LocalTrackUnpublished, function () { lobbyLocal(room); lobbyControls(); });
-    room.on(E.Disconnected, function () {
+    room.on(E.Disconnected, function (reason) {
       if (!cur() || !lobby || lobby.room !== room) return;
       lobby = null;
-      reportProblem('video-caiu');
+      reportProblem('video-caiu', discReason(reason));
       lobbyControls();
-      lobbyRetry = setTimeout(function () { if (snap && snap.lobby && !waitingEl.hidden) startLobby(snap.lobby); }, 2500);
+      lobbyRetry = setTimeout(function () { if (snap && snap.lobby && !waitingEl.hidden) startLobby(snap.lobby); }, 700);
     });
   }
   function connectLobby(lk, err) {
@@ -1450,7 +1533,7 @@
   function startLobby(lk) {
     var seq = ++lobbySeq;
     clearTimeout(lobbyRetry);
-    if (lobby) { var old = lobby.room; lobby = null; try { old.disconnect(); } catch (e) { /* ignorar */ } }
+    if (lobby) { var old = lobby.room; lobby = null; dropBlur(old); try { old.disconnect(); } catch (e) { /* ignorar */ } }
     clearLobbyTiles();
     lobbyControls();
     return bestDevices().then(function (d) {
@@ -1493,7 +1576,7 @@
   function leaveLobby() {
     lobbySeq++;
     clearTimeout(lobbyRetry);
-    if (lobby) { var r = lobby.room; lobby = null; try { r.disconnect(); } catch (e) { /* ignorar */ } }
+    if (lobby) { var r = lobby.room; lobby = null; dropBlur(r); try { r.disconnect(); } catch (e) { /* ignorar */ } }
     clearLobbyTiles();
     lobbyControls();
     $('lobby').hidden = true;
@@ -1511,6 +1594,7 @@
     var lp = lobby.room.localParticipant;
     if (!lp.isMicrophoneEnabled) stopCheck();
     var next = !lp.isMicrophoneEnabled;
+    wantSet(next, undefined);
     lobbyControls({ mic: next });
     var mt = lTiles.get(snap.me.pid); if (mt) mt.el.classList.toggle('mic-off', !next);
     lp.setMicrophoneEnabled(next).then(function () { lobbyLocal(lobby.room); lobbyControls(); lobby.room.startAudio().catch(function () { /* ignorar */ }); },
@@ -1521,6 +1605,7 @@
     var lp = lobby.room.localParticipant;
     if (!lp.isCameraEnabled) stopCheck();
     var next = !lp.isCameraEnabled;
+    wantSet(undefined, next);
     lobbyControls({ cam: next });
     if (!next) { var ct = lTiles.get(snap.me.pid); if (ct) ct.el.classList.add('video-off'); }
     lp.setCameraEnabled(next).then(function () { lobbyLocal(lobby.room); lobbyControls(); },

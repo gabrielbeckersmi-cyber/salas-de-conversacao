@@ -94,10 +94,11 @@
   @keyframes chatpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192, 40, 31, 0.5); } 50% { box-shadow: 0 0 0 6px rgba(192, 40, 31, 0); } }
   @media (prefers-reduced-motion: reduce) { .chat-new .chat-toggle { animation: none; } }
   .endmsg { white-space: pre-line; }
-  .tile .fxbtn { display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5; width: 46px; height: 46px; padding: 0; border-radius: 12px; align-items: center; justify-content: center; background: rgba(13,27,42,.78); color: #fff; border: 2px solid rgba(255,255,255,.7); cursor: pointer; min-height: 0; }
+  .tile .fxbtn { display: flex; opacity: 0; pointer-events: none; transition: opacity .35s ease; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5; width: 46px; height: 46px; padding: 0; border-radius: 12px; align-items: center; justify-content: center; background: rgba(13,27,42,.78); color: #fff; border: 2px solid rgba(255,255,255,.7); cursor: pointer; min-height: 0; }
   .tile .fxbtn.on { background: var(--primary, #0e86d8); border-color: #fff; }
-  .tile.me.has-video:not(.video-off).fx-open .fxbtn { display: flex; }
-  .tile.me.has-video:not(.video-off) { cursor: pointer; }
+  .tile.me.has-video:not(.video-off).fx-open .fxbtn { opacity: 1; pointer-events: auto; }
+  @media (hover: hover) and (pointer: fine) { .tile.me.has-video:not(.video-off):hover .fxbtn { opacity: 1; pointer-events: auto; } }
+  .tile.me.fx-hide .fxbtn { opacity: 0 !important; pointer-events: none !important; }
   /* teste de câmera e microfone antes de entrar */
   .check { display: none !important; }
   .photo-pick { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 4px; }
@@ -180,6 +181,7 @@
   .count .timer { font-size: 36px; }
   .lobby { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; margin: 4px 0 14px; max-width: 640px; }
   .lobby[hidden] { display: none; }
+  .lobby-main { display: flex; flex-direction: column; gap: 10px; }
   .lobby-head h2 { font-size: 15px; font-weight: 600; }
   .lobby-tiles { display: grid; gap: 8px; height: 340px; overflow: hidden; justify-content: center; align-content: center; }
   .lobby-tiles .tile { aspect-ratio: auto; width: 100%; height: 100%; }
@@ -208,21 +210,18 @@
     body.in-wait .wrap { max-width: none; height: 100vh; height: 100dvh; overflow: hidden; padding: 0 20px 10px; gap: 8px; box-sizing: border-box; }
     body.in-wait .brand, body.in-wait .netbar { flex: none; }
     body.in-wait #waiting { flex: 1; min-height: 0; }
-    body.in-wait #waiting .card { height: 100%; box-sizing: border-box; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 380px; grid-template-rows: auto auto minmax(0, 1fr) auto auto auto auto; column-gap: 16px; row-gap: 8px; align-content: stretch; }
+    body.in-wait #waiting .card { height: 100%; box-sizing: border-box; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 380px; grid-template-rows: auto auto minmax(0, 1fr) auto; column-gap: 16px; row-gap: 8px; align-content: stretch; }
     body.in-wait .w-head { display: block; grid-column: 1 / -1; grid-row: 1; }
     body.in-wait .lobby { display: contents; }
     body.in-wait .lobby[hidden] { display: none; }
-    body.in-wait .lobby-head { grid-column: 1; grid-row: 2; }
+    /* lado esquerdo inteiro: câmeras ocupam todo o espaço e os botões ficam embaixo */
+    body.in-wait .lobby-main { grid-column: 1; grid-row: 2 / span 3; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+    body.in-wait .lobby-tiles { flex: 1; height: auto; min-height: 0; }
     body.in-wait .themes { grid-column: 2; grid-row: 2; margin: 0; max-width: none; align-self: end; }
-    body.in-wait .lobby-tiles { grid-column: 1; grid-row: 3; height: auto; min-height: 0; }
-    body.in-wait #lobby-audio { grid-column: 1; grid-row: 4; }
-    body.in-wait #lb-warn { grid-column: 1; grid-row: 4; }
-    body.in-wait .lobby .controls { grid-column: 1; grid-row: 5; }
-    body.in-wait #lb-sound { grid-column: 1; grid-row: 6; }
-    body.in-wait .lobby-chat { grid-column: 2; grid-row: 3 / span 2; min-height: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+    body.in-wait .lobby-chat { grid-column: 2; grid-row: 3; min-height: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
     body.in-wait .lobby-chat .chat-list { flex: 1; height: auto; min-height: 0; }
-    body.in-wait .game { grid-column: 2; grid-row: 5 / span 3; margin: 0; min-height: 0; overflow-y: auto; }
-    body.in-wait .check { grid-column: 1; grid-row: 7; }
+    body.in-wait .game { grid-column: 2; grid-row: 4; margin: 0; min-height: 0; max-height: 40vh; overflow-y: auto; }
+    body.in-wait .check { display: none; }
   }
   .lobby-chat .chat-list { height: 150px; }
   .lobby-chat .chat-form { position: static; margin: 0; padding: 0; }
@@ -309,6 +308,7 @@
           <ul id="themes-list"></ul>
         </div>
         <section class="lobby" id="lobby" aria-label="Sala de espera" hidden>
+          <div class="lobby-main">
           <div class="lobby-head"><h2>Quem está na sala de espera <span class="small" id="lobby-count"></span></h2></div>
           <div class="tiles lobby-tiles" id="lobby-tiles"></div>
           <div id="lobby-audio" hidden></div>
@@ -318,6 +318,7 @@
             <button class="btn" id="lb-cam" type="button"></button>
           </div>
           <button class="btn btn-sm" id="lb-sound" type="button" hidden>Ativar o som da sala de espera</button>
+          </div>
           <div class="lobby-chat" id="lb-chat">
             <div class="lobby-chat-head"><span class="lbl">Chat da sala de espera</span><button class="btn btn-sm" id="lb-chat-toggle" type="button" aria-expanded="true">Esconder</button></div>
             <div class="chat-list" id="lb-chat-list" role="log" aria-live="polite"></div>

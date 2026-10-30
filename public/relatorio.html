@@ -93,7 +93,7 @@
       h += '<div class="scroll"><table><thead><tr><th>Tipo</th><th class="n">Quantidade</th></tr></thead><tbody>' +
         kinds.map(function (k) { return '<tr><td>' + esc(r.problems.labels[k] || k) + '</td><td class="n">' + r.problems.byKind[k] + '</td></tr>'; }).join('') + '</tbody></table></div>' +
         '<h2 style="margin-top:14px">Últimos registros</h2><div class="scroll"><table><thead><tr><th>Hora</th><th>Tipo</th><th>Quem</th></tr></thead><tbody>' +
-        r.problems.list.slice().reverse().map(function (p) { return '<tr><td>' + hm(p.at) + '</td><td>' + esc(r.problems.labels[p.kind] || p.kind) + '</td><td>' + esc(p.who || '—') + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+        r.problems.list.slice().reverse().map(function (p) { return '<tr><td>' + hm(p.at) + '</td><td>' + esc(r.problems.labels[p.kind] || p.kind) + '</td><td>' + esc(p.who || '—') + (p.detail ? ' <span class="small">(' + esc(p.detail) + ')</span>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>' +
         '<p class="note" style="margin-top:8px">Contam quedas de conexão com o servidor, falhas e reconexões na sala de vídeo e momentos de conexão ruim detectados pelo LiveKit. Um aluno com internet instável pode gerar vários registros.</p>';
     }
     h += '</div><p class="note">Gerado em ' + dt(r.updatedAt) + ' (horário de Brasília).</p>';

@@ -409,23 +409,23 @@ function build(env) {
   });
 
   // problemas de conexão avisados pelo navegador (alimentam o relatório)
-  const PROBLEM_KINDS = ['video-falhou', 'video-caiu', 'video-reconectando', 'qualidade-ruim'];
+  const PROBLEM_KINDS = ['video-falhou', 'video-caiu', 'video-reconectando', 'qualidade-ruim', 'midia-religada'];
   const problemAt = new Map();
-  function noteProblem(c, kind, who, minGapMs) {
+  function noteProblem(c, kind, who, minGapMs, detail) {
     if (c.phase === 'done') return;
     const k = c.id + '|' + kind + '|' + who;
     const now = Date.now();
     if (now - (problemAt.get(k) || 0) < (minGapMs || 15000)) return;
     problemAt.set(k, now);
     if (problemAt.size > 20000) problemAt.clear();
-    C.logProblem(c, kind, who, now);
+    C.logProblem(c, kind, who, now, detail);
     reportSoon(c);
   }
   app.post('/api/classes/:id/problem', function (req, res) {
     const c = getClass(req.params.id);
     const s = c.students[String(req.body.studentId)];
     const kind = String(req.body.kind || '');
-    if (s && PROBLEM_KINDS.indexOf(kind) !== -1) noteProblem(c, kind, s.name, 20000);
+    if (s && PROBLEM_KINDS.indexOf(kind) !== -1) noteProblem(c, kind, s.name, 20000, String(req.body.detail || '').replace(/[^\w .:/-]/g, '').slice(0, 40));
     res.json({ ok: true });
   });
   app.post('/api/professor/classes/:id/problem', needTeacher, function (req, res) {

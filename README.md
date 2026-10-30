@@ -134,3 +134,11 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 
 - **Teste de microfone:** a voz agora é detectada somando o tempo acima de um nível mínimo (a marca do meio da barra, mais sensível que antes): pelo menos 0,6 s no total, espalhado por 0,8 s ou mais. Não precisa ficar sempre acima da marca; estalos de cabo continuam sendo recusados.
 - **Relatório:** mostra quantas vezes o professor foi chamado (e quantos chamados foram atendidos) e uma coluna "Chamados" por aluno.
+
+## Versão de 30/10 (4)
+
+- **Teste de microfone:** mais fácil — basta 0,3 s de voz acumulada (espalhada por 0,4 s ou mais).
+- **Sala de espera (computador):** as câmeras ocupam todo o lado esquerdo. No celular nada mudou.
+- **Botão de desfoque:** no computador aparece ao passar o mouse na câmera; no celular aparece ao tocar, por 1 s, e some suavemente. Ao ligar/desligar, o botão some.
+- **Correção do travamento com desfoque:** o efeito agora é aplicado uma vez por vez (sem pedidos repetidos) e é removido antes de trocar de sala/desconectar.
+- **Quedas de câmera/microfone:** se o navegador desligar câmera ou microfone sozinho, a plataforma religa em até ~3 s (até 3 tentativas). O relatório passa a registrar o motivo das desconexões e os religamentos ("midia-religada"). Reconexão mais rápida (0,7 s).
