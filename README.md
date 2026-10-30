@@ -142,3 +142,8 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 - **Botão de desfoque:** no computador aparece ao passar o mouse na câmera; no celular aparece ao tocar, por 1 s, e some suavemente. Ao ligar/desligar, o botão some.
 - **Correção do travamento com desfoque:** o efeito agora é aplicado uma vez por vez (sem pedidos repetidos) e é removido antes de trocar de sala/desconectar.
 - **Quedas de câmera/microfone:** se o navegador desligar câmera ou microfone sozinho, a plataforma religa em até ~3 s (até 3 tentativas). O relatório passa a registrar o motivo das desconexões e os religamentos ("midia-religada"). Reconexão mais rápida (0,7 s).
+
+## Versão de 30/10 (5)
+
+- **Celular:** tocar na imagem com o desfoque ativo mostra de novo o botão para desativar.
+- **DUPLICATE_IDENTITY:** reconectar na hora derrubava a outra conexão do mesmo aluno (outra aba/aparelho ou conexão antiga) e as duas se derrubavam em vício. Agora a sala de espera não pede conexão duplicada enquanto já está conectando, e, ao receber esse motivo, a reconexão espera mais a cada vez e para depois de 3 em 1 minuto, avisando o aluno.

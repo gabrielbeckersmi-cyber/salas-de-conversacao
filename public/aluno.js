@@ -40,6 +40,18 @@
     try { var names = LK.DisconnectReason || {}; for (var k in names) { if (names[k] === r && isNaN(Number(k))) return k; } } catch (e) { /* ignorar */ }
     return r === undefined ? '' : 'motivo ' + r;
   }
+  // DUPLICATE_IDENTITY: o mesmo aluno entrou em outra aba/aparelho (ou uma conexão antiga ficou pendurada). Reconectar na hora derruba a outra
+  // conexão e as duas ficam se derrubando em vício; por isso espera mais a cada vez e, depois de 3 em 1 minuto, para e avisa.
+  var dupHits = [];
+  function retryAfterDrop(reason, base) {
+    if (discReason(reason) !== 'DUPLICATE_IDENTITY') return { delay: base, stop: false };
+    var now = Date.now();
+    dupHits = dupHits.filter(function (t) { return now - t < 60000; });
+    dupHits.push(now);
+    if (dupHits.length >= 3) return { delay: 0, stop: true };
+    return { delay: 2500 * dupHits.length + Math.round(Math.random() * 1500), stop: false };
+  }
+  var DUP_MSG = 'Seu nome está aberto em outra aba ou aparelho, e uma conexão derruba a outra. Feche a outra e recarregue esta página.';
   function watchHealth(room, current) {
     var E = LK.RoomEvent;
     room.on(E.ConnectionStateChanged, function (st) { if (current() && (st === 'reconnecting' || st === 'signalReconnecting')) reportProblem('video-reconectando'); });
@@ -1059,6 +1071,7 @@
     // computador: o botão aparece ao passar o mouse (CSS). Celular: toque na imagem mostra por 1 s e some com fade.
     el.addEventListener('click', function (e) {
       if (e.target.closest && e.target.closest('.fxbtn')) return;
+      el.classList.remove('fx-hide');
       el.classList.add('fx-open');
       clearTimeout(hideT);
       hideT = setTimeout(function () { el.classList.remove('fx-open'); }, 1000);
@@ -1185,8 +1198,10 @@
       if (seq !== connSeq || !live || live.room !== room) return;
       live = null;
       reportProblem('video-caiu', discReason(reason));
+      var rt = retryAfterDrop(reason, 700);
+      if (rt.stop) { setWarn(DUP_MSG, false); return; }
       setWarn('Você foi desconectado da sala de vídeo. Reconectando…', false);
-      retryTimer = setTimeout(function () { if (snap && snap.room && snap.room.lk) startLive(snap.room.lk); }, 700);
+      retryTimer = setTimeout(function () { if (snap && snap.room && snap.room.lk) startLive(snap.room.lk); }, rt.delay);
     });
   }
 
@@ -1521,17 +1536,22 @@
       lobby = null;
       reportProblem('video-caiu', discReason(reason));
       lobbyControls();
-      lobbyRetry = setTimeout(function () { if (snap && snap.lobby && !waitingEl.hidden) startLobby(snap.lobby); }, 700);
+      var rt = retryAfterDrop(reason, 700);
+      if (rt.stop) { lobbyWarn(DUP_MSG); return; }
+      lobbyRetry = setTimeout(function () { if (snap && snap.lobby && !waitingEl.hidden) startLobby(snap.lobby); }, rt.delay);
     });
   }
   function connectLobby(lk, err) {
     if (!lk) { if (err) { $('lobby').hidden = false; lobbyWarn('A sala de espera em vídeo não está disponível agora.'); } return; }
     $('lobby').hidden = false;
     if (lobby && lobby.name === lk.room) return;
+    if (lobbyJoining === lk.room) return;   // já conectando: pedir de novo derrubaria a própria conexão (identidade duplicada)
     startLobby(lk);
   }
+  var lobbyJoining = null;
   function startLobby(lk) {
     var seq = ++lobbySeq;
+    lobbyJoining = lk.room;
     clearTimeout(lobbyRetry);
     if (lobby) { var old = lobby.room; lobby = null; dropBlur(old); try { old.disconnect(); } catch (e) { /* ignorar */ } }
     clearLobbyTiles();
@@ -1553,6 +1573,7 @@
       watchHealth(room, function () { return seq === lobbySeq; });
       return room.connect(lk.url, lk.token).then(function () {
         if (seq !== lobbySeq) { try { room.disconnect(); } catch (e) { /* ignorar */ } return; }
+        lobbyJoining = null;
         lobby = { room: room, name: lk.room };
         lobbyWarn(null);
         lobbyLocal(room);
@@ -1567,6 +1588,7 @@
         }).then(function () { if (seq !== lobbySeq) return; lobbyLocal(room); lobbyControls(); });
       }, function () {
         if (seq !== lobbySeq) return;
+        lobbyJoining = null;
         reportProblem('video-falhou');
         lobbyWarn('Não consegui entrar na conversa da sala de espera. Tentando de novo…');
         lobbyRetry = setTimeout(function () { if (snap && snap.lobby && !waitingEl.hidden) startLobby(snap.lobby); }, 4000);
@@ -1575,6 +1597,7 @@
   }
   function leaveLobby() {
     lobbySeq++;
+    lobbyJoining = null;
     clearTimeout(lobbyRetry);
     if (lobby) { var r = lobby.room; lobby = null; dropBlur(r); try { r.disconnect(); } catch (e) { /* ignorar */ } }
     clearLobbyTiles();
