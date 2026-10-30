@@ -74,6 +74,7 @@
       '<div class="stat"><b>' + hm(r.startedAt) + '</b><span>início da 1ª rodada</span></div>' +
       '<div class="stat"><b>' + hm(r.endedAt) + '</b><span>fim da aula</span></div>' +
       '<div class="stat"><b>' + dur(r.startedAt, r.endedAt) + '</b><span>duração (do início da 1ª rodada ao fim)</span></div>' +
+      '<div class="stat"><b>' + ((r.calls && r.calls.total) || 0) + '</b><span>vezes que o professor foi chamado' + (r.calls && r.calls.total ? ' (' + r.calls.answered + ' atendido' + (r.calls.answered === 1 ? '' : 's') + ')' : '') + '</span></div>' +
       '<div class="stat' + (r.problems.total ? ' bad' : '') + '"><b>' + r.problems.total + '</b><span>problemas de conexão registrados</span></div></div>';
     if (T.onlyWaiting || T.late) {
       h += '<p class="note">' + (T.onlyWaiting ? T.onlyWaiting + ' aluno' + (T.onlyWaiting === 1 ? '' : 's') + ' entrou' + (T.onlyWaiting === 1 ? '' : 'ram') + ' mas ficou só na sala de espera. ' : '') +
@@ -82,9 +83,9 @@
     h += '<div class="card"><h2>Rodadas</h2><div class="scroll"><table><thead><tr><th>Rodada</th><th>Início</th><th>Fim</th><th class="n">Duração</th></tr></thead><tbody>' +
       (r.rounds.length ? r.rounds.map(function (x) { return '<tr><td>Rodada ' + x.n + '</td><td>' + dt(x.startedAt) + '</td><td>' + (x.endedAt ? dt(x.endedAt) : 'em andamento') + '</td><td class="n">' + dur(x.startedAt, x.endedAt) + '</td></tr>'; }).join('') : '<tr><td colspan="4">A primeira rodada ainda não começou.</td></tr>') +
       '</tbody></table></div></div>';
-    h += '<div class="card"><h2>Alunos (' + r.students.length + ')</h2><div class="scroll"><table><thead><tr><th>Nome</th><th>Nível</th><th>Entrou às</th><th class="n">Rodadas</th></tr></thead><tbody>' +
+    h += '<div class="card"><h2>Alunos (' + r.students.length + ')</h2><div class="scroll"><table><thead><tr><th>Nome</th><th>Nível</th><th>Entrou às</th><th class="n">Rodadas</th><th class="n">Chamados</th></tr></thead><tbody>' +
       r.students.map(function (s) {
-        return '<tr><td>' + esc(s.name) + (s.late ? ' <span class="small">(entrou depois do início)</span>' : '') + '</td><td><span class="lv ' + (s.level === 'basico' ? 'b' : 'i') + '">' + (s.listener ? 'Ouvinte' : A.LEVEL_NAME[s.level]) + '</span></td><td>' + hm(s.joinedAt) + '</td><td class="n">' + (s.rounds.length ? s.rounds.join(' e ') : 'só sala de espera') + '</td></tr>';
+        return '<tr><td>' + esc(s.name) + (s.late ? ' <span class="small">(entrou depois do início)</span>' : '') + '</td><td><span class="lv ' + (s.level === 'basico' ? 'b' : 'i') + '">' + (s.listener ? 'Ouvinte' : A.LEVEL_NAME[s.level]) + '</span></td><td>' + hm(s.joinedAt) + '</td><td class="n">' + (s.rounds.length ? s.rounds.join(' e ') : 'só sala de espera') + '</td><td class="n">' + (s.calls || 0) + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
     h += '<div class="card"><h2>Problemas de conexão (' + r.problems.total + ')</h2>';
     if (!r.problems.total) h += '<p>Nenhum problema de conexão registrado. 🎉</p>';

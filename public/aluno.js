@@ -384,8 +384,9 @@
       stopListen();
       testing = true;
       openPop('<h2>Fale algo para testar seu microfone</h2><div class="meter pre-meter" aria-hidden="true"><i id="pp-meter"></i></div><p class="small">Fale normalmente até a barra passar da marca do meio.</p><p class="small" id="pp-heard">&nbsp;</p>');
-      var maxLevel = 0, level = 0, since = 0, sttErr = '', haveAnalyser = false;
-      var NEED = 0.192;   // mais da metade da barra (a barra mostra nível × 2,6)
+      var maxLevel = 0, level = 0, sttErr = '', haveAnalyser = false;
+      var NEED = 0.08;          // nível mínimo de voz (a marca do meio da barra); ruído de sala fica abaixo disso
+      var voiced = 0, firstV = 0, lastV = 0, lastT = 0;
       var AC = window.AudioContext || window.webkitAudioContext;
       if (AC) {
         try {
@@ -401,11 +402,16 @@
             an.getByteTimeDomainData(buf);
             var peak = 0;
             for (var i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i] - 128) / 128);
-            level = Math.max(peak, level * 0.85);   // sobe na hora e desce devagar: um estalo isolado (mexer no cabo) some em ~0,2 s
+            level = Math.max(peak, level * 0.8);   // sobe na hora e desce rápido
             maxLevel = Math.max(maxLevel, level);
-            var m = $('pp-meter'); if (m) m.style.width = Math.min(100, level * 260) + '%';
+            var m = $('pp-meter'); if (m) m.style.width = Math.min(100, level / (NEED * 2) * 100) + '%';
             var now = performance.now();
-            if (level > NEED) { if (!since) since = now; if (now - since >= 500) { success(); return; } } else since = 0;   // precisa se manter acima da metade por 0,5 s, como fala de verdade
+            var dt = lastT ? Math.min(100, now - lastT) : 0;
+            lastT = now;
+            if (level > NEED) { voiced += dt; if (!firstV) firstV = now; lastV = now; }
+            // fala de verdade: soma pelo menos 0,6 s acima do mínimo, espalhada por 0,8 s ou mais (a fala sobe e desce, então não precisa ser contínua).
+            // Um estalo de cabo dura poucos centésimos de segundo e não chega nisso.
+            if (voiced >= 600 && lastV - firstV >= 800) { success(); return; }
             raf = requestAnimationFrame(tick);
           };
           tick();
@@ -451,8 +457,8 @@
         }
         attempts++;
         if (attempts >= 3) { showListenerOffer(); return; }
-        var blip = maxLevel > 0.192;   // chegou um pico forte, mas não se manteve como voz (estalo, cabo)
-        var low = !blip && maxLevel >= 0.06;   // chegou som, mas fraco
+        var blip = maxLevel > 0.08;   // chegou um pico forte, mas não se manteve como voz (estalo, cabo)
+        var low = !blip && maxLevel >= 0.03;   // chegou som, mas fraco
         openPop('<h2>' + (blip ? 'Só ouvi um ruído' : low ? 'Som muito baixo' : 'Não consegui ouvir') + '</h2>' +
           (blip ? '<p class="pre-lowmsg">Captei só um ruído rápido, não uma voz. Fale normalmente por alguns segundos e tente de novo.</p>'
           : low ? '<p class="pre-lowmsg">Seu microfone está captando som, mas muito baixo. Fale mais perto do microfone ou mais alto e tente de novo.</p><p>Se continuar baixo, experimente selecionar outro microfone.</p>'

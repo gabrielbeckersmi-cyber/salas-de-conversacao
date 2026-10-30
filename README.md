@@ -129,3 +129,8 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 - **Teste de microfone:** precisa passar da metade da barra e se manter por 0,5 s. Estalo isolado não vale. Som fraco mostra "muito baixo". Botões "Testar microfone" (piscando) e "Entrar na aula" em amarelo.
 - **Borrar fundo:** o ícone aparece no centro da câmera do aluno.
 - **Permissão negada:** passo a passo específico para o navegador (Chrome, Safari, Samsung Internet, Firefox, Edge; iPhone, Android e computador) e aviso para sair de navegadores dentro de aplicativos (Instagram, Facebook…).
+
+## Versão de 30/10 (3)
+
+- **Teste de microfone:** a voz agora é detectada somando o tempo acima de um nível mínimo (a marca do meio da barra, mais sensível que antes): pelo menos 0,6 s no total, espalhado por 0,8 s ou mais. Não precisa ficar sempre acima da marca; estalos de cabo continuam sendo recusados.
+- **Relatório:** mostra quantas vezes o professor foi chamado (e quantos chamados foram atendidos) e uma coluna "Chamados" por aluno.
