@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador · Salas de Conversação</title>
+<link rel="icon" href="@@LOGO@@">
+<style>
+  :root { --bg:#eaf3fb; --card:#fff; --ink:#1d2433; --mut:#5d6b82; --br:#d3deec; --pri:#1a73e8; --yel:#f7c948; --ok:#1c9c68; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Nunito, system-ui, sans-serif; background:var(--bg); color:var(--ink); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  header { display:flex; align-items:center; gap:14px; padding:10px 16px; background:var(--card); border-bottom:1px solid var(--br); flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header .tag { font-size:12px; color:var(--mut); }
+  .tabs { display:flex; gap:6px; margin-left:auto; }
+  .tabs button { border:1px solid var(--br); background:#fff; padding:7px 14px; border-radius:999px; font:inherit; font-weight:700; cursor:pointer; color:var(--ink); }
+  .tabs button.on { background:var(--pri); color:#fff; border-color:var(--pri); }
+  main { flex:1; display:grid; grid-template-columns: 1fr 340px; min-height:0; }
+  #stage { position:relative; display:flex; align-items:center; justify-content:center; gap:26px; padding:14px; min-width:0; min-height:0; overflow:hidden; }
+  .dev { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .dev .cap { font-size:12px; font-weight:800; color:var(--mut); text-transform:uppercase; letter-spacing:.06em; }
+  .box { transform-origin: top left; }
+  .holder { position:relative; }
+  .phone { width:420px; height:830px; background:#111; border-radius:46px; padding:14px 15px; box-shadow:0 14px 40px rgba(20,30,60,.35); }
+  .phone iframe { width:390px; height:802px; border:0; border-radius:32px; background:#fff; display:block; }
+  .desk { width:1300px; height:810px; background:#222; border-radius:14px; padding:10px 10px 22px; box-shadow:0 14px 40px rgba(20,30,60,.35); }
+  .desk iframe { width:1280px; height:778px; border:0; border-radius:6px; background:#fff; display:block; }
+  aside { background:var(--card); border-left:1px solid var(--br); padding:14px; overflow:auto; display:flex; flex-direction:column; gap:10px; }
+  aside > * { flex-shrink:0; }
+  aside h2 { margin:0; font-size:15px; }
+  .ph { background:#f3f7fc; border:1px solid var(--br); border-radius:12px; padding:10px 12px; }
+  .ph b#p-phase { display:block; font-size:14px; }
+  #p-timer { font:700 26px 'JetBrains Mono', ui-monospace, monospace; }
+  .small { font-size:12px; color:var(--mut); }
+  #p-rooms { max-height:150px; overflow:auto; font-size:12px; display:flex; flex-direction:column; gap:4px; }
+  .rm span { display:inline-block; background:#dfe9f7; border-radius:6px; padding:1px 6px; margin-right:6px; font-weight:800; }
+  aside button.act { border:1px solid var(--br); background:#fff; border-radius:10px; padding:10px; font:inherit; font-weight:700; cursor:pointer; text-align:left; color:var(--ink); }
+  aside button.act:hover { border-color:var(--pri); }
+  aside button.main { background:var(--yel); border-color:#e1b32f; }
+  aside button.danger { color:#b3261e; }
+  aside input[type=text], aside select { width:100%; font:inherit; padding:8px; border:1px solid var(--br); border-radius:8px; background:#fff; color:var(--ink); }
+  aside label { font-size:12px; font-weight:700; color:var(--mut); display:block; margin-bottom:3px; }
+  details summary { cursor:pointer; font-weight:700; font-size:13px; }
+  details .in { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .row label { margin:0; display:flex; align-items:center; gap:6px; }
+  .help { font-size:12px; color:var(--mut); line-height:1.4; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } aside { border-left:0; border-top:1px solid var(--br); max-height:40vh; } }
+</style>
+</head>
+<body>
+<header>
+  <img src="@@LOGO@@" width="22" height="24" alt="">
+  <h1>Simulador · Salas de Conversação</h1><span class="tag">Demonstração: nenhuma aula real está acontecendo</span>
+  <div class="tabs" id="tabs"><button data-m="both" class="on">Celular + Computador</button><button data-m="mobile">Só celular</button><button data-m="desktop">Só computador</button></div>
+</header>
+<main>
+  <div id="stage"></div>
+  <aside>
+    <h2>Painel do professor (simulado)</h2>
+    <div class="ph"><b id="p-phase"></b><span id="p-timer">--:--</span> <span class="small" id="p-count"></span></div>
+    <div id="p-rooms" class="ph"></div>
+    <button class="act main" id="b-start" data-a="start"></button>
+    <button class="act" id="b-skip" data-a="skip"></button>
+    <button class="act" id="b-add" data-a="add">👥 Chegam mais 4 alunos</button>
+    <button class="act" id="b-chat" data-a="chat">💬 Colegas escrevem no chat</button>
+    <div class="ph" id="b-say" style="display:flex;flex-direction:column;gap:6px"><label for="p-say">Mensagem do professor para as salas</label><input type="text" id="p-say" placeholder="Olá, pessoal! Vamos começar."><button class="act" data-a="say">📣 Enviar mensagem</button></div>
+    <button class="act" id="b-mute" data-a="mute">🔇 Professor silencia o microfone dos alunos</button>
+    <button class="act" id="b-answer" data-a="answer">🙋 Professor atende o chamado da sala</button>
+    <button class="act" id="b-late" data-a="late"></button>
+    <button class="act danger" id="b-end" data-a="end">⏹ Encerrar a aula</button>
+    <details><summary>Configurações da simulação</summary><div class="in">
+      <div><label for="p-min">Minutos por rodada</label><select id="p-min"><option value="1">1 minuto</option><option value="2" selected>2 minutos</option><option value="5">5 minutos</option><option value="15">15 minutos</option></select></div>
+      <div><label for="p-etext">Recado de fim de aula</label><input type="text" id="p-etext"></div>
+      <div><label for="p-eurl">Link do botão (opcional)</label><input type="text" id="p-eurl"></div>
+      <div><label for="p-elabel">Texto do botão</label><input type="text" id="p-elabel"></div>
+      <button class="act" id="b-saveend">Salvar recado</button>
+      <label class="row"><input type="checkbox" id="p-fake"> Usar câmera e microfone de mentira (se não quiser mostrar a sua)</label>
+    </div></details>
+    <button class="act" data-a="reset">🔄 Reiniciar a simulação</button>
+    <p class="help">Como usar: nas telas ao lado, digite um nome, escolha o nível e faça o teste de câmera e microfone como um aluno de verdade. Depois use este painel para conduzir a aula. Colegas fictícios já estão na sala de espera.</p>
+  </aside>
+</main>
+<script>window.__DINAMICAS__=@@DINAMICAS@@;window.__PERGUNTAS__=@@PERGUNTAS@@;</script>
+<script>@@SIMLIB@@</script>
+<script>@@SIMJS@@</script>
+<script>
+(function () {
+  var ALUNO = @@ALUNO@@;
+  var MOCK = @@MOCK@@;
+  var mode = 'both', frames = {};
+  var stage = document.getElementById('stage');
+  function doc(slot) { return ALUNO.replace('/*__SLOT__*/', 'window.__SLOT=' + JSON.stringify(slot) + ';').replace('/*__MOCK__*/', function () { return MOCK; }); }
+  function build() {
+    stage.innerHTML = '';
+    ['mobile', 'desktop'].forEach(function (slot) {
+      var d = document.createElement('div'); d.className = 'dev'; d.dataset.slot = slot;
+      d.innerHTML = '<div class="cap">' + (slot === 'mobile' ? 'Celular do aluno' : 'Computador do aluno') + '</div><div class="holder"><div class="box ' + (slot === 'mobile' ? 'phone' : 'desk') + '"><iframe allow="camera; microphone; autoplay; fullscreen"></iframe></div></div>';
+      stage.appendChild(d);
+      var f = d.querySelector('iframe'); frames[slot] = f;
+      f.addEventListener('load', function () { SIM.slots()[slot].win = f.contentWindow; });
+      f.srcdoc = doc(slot);
+    });
+    layout();
+  }
+  function layout() {
+    var W = stage.clientWidth - 28, H = stage.clientHeight - 28;
+    var devs = Array.prototype.slice.call(stage.children);
+    var vis = devs.filter(function (d) { var show = mode === 'both' || mode === d.dataset.slot; d.style.display = show ? '' : 'none'; return show; });
+    var dims = { mobile: [420, 830], desktop: [1300, 810] };
+    var totalW = vis.reduce(function (a, d) { return a + dims[d.dataset.slot][0]; }, 0) + 26 * (vis.length - 1);
+    var maxH = Math.max.apply(null, vis.map(function (d) { return dims[d.dataset.slot][1]; })) + 24;
+    var sc = Math.min(1, W / totalW, H / maxH);
+    vis.forEach(function (d) {
+      var s = d.dataset.slot, b = d.querySelector('.box'), h = d.querySelector('.holder');
+      b.style.transform = 'scale(' + sc + ')'; h.style.width = dims[s][0] * sc + 'px'; h.style.height = dims[s][1] * sc + 'px';
+    });
+  }
+  window.addEventListener('resize', layout);
+  document.getElementById('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return; mode = b.dataset.m;
+    document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.toggle('on', x === b); }); layout();
+  });
+  document.querySelector('aside').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-a]'); if (b) SIM.act(b.dataset.a);
+  });
+  document.getElementById('b-saveend').addEventListener('click', function () { SIM.saveEnd(); });
+  document.getElementById('p-fake').addEventListener('change', function () { SIM.setFake(this.checked); });
+  document.addEventListener('sim-reset', build);
+  SIM.init();
+  var em = SIM.endMsg();
+  document.getElementById('p-etext').value = em.text; document.getElementById('p-eurl').value = em.url; document.getElementById('p-elabel').value = em.label;
+  build();
+})();
+</script>
+</body>
+</html>

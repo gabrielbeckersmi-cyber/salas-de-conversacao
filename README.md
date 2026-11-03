@@ -152,3 +152,27 @@ Os relatórios ficam no nó `relatoriosSalas` do mesmo Realtime Database. A chav
 
 - **Painel do professor:** a tela inicial não lista mais aulas antigas; só o formulário "Nova aula" (e, se houver, a aula que ainda está em andamento, para não perder o acesso). Os relatórios continuam em "Relatórios".
 - **Recado de fim de aula:** texto, link e texto do botão são copiados automaticamente da aula anterior. Se mudar em uma aula, a próxima já herda a mudança. Os minutos por rodada também vêm preenchidos com o valor da última aula.
+
+## Simulador para apresentações (public/simulacao.html)
+
+Arquivo único (funciona até dando dois cliques, sem internet e sem servidor) que mostra a tela do aluno no **celular** e no **computador**, com um painel de professor simulado para conduzir uma "aula" falsa: colegas fictícios, salas, rodadas com cronômetro, chat, chamado do professor, silenciar microfone, entrada tardia, encerramento e recado final. Usa o mesmo código real da tela do aluno e a mesma lógica de salas do servidor; só o vídeo e a rede são simulados (câmera e microfone são os seus, ou de mentira se marcar a opção em "Configurações da simulação"). Também fica disponível em `/simulacao.html` no site.
+
+Para regenerar depois de mudar a tela do aluno: `ESBUILD=caminho/do/esbuild node demo/build.js` (o esbuild fica em `node_modules` se instalar com `npm i -D esbuild`).
+
+## Versão de 03/11
+
+- **Câmeras sem faixas pretas:** na sala de espera e nas salas de conversação todas as câmeras têm a mesma altura e a largura segue a proporção de cada câmera (horizontal fica mais larga, vertical mais estreita). O vídeo aparece inteiro, sem corte e sem barras. A altura é a maior possível para todos caberem sem rolagem.
+- **Contagem antes da sala:** quando a rodada começa, o aluno vê por 3 segundos "Sua sala de conversação vai iniciar em…" com 3, 2, 1, e só então entra na sala. Quem recarrega a página no meio da rodada entra direto.
+- O simulador (`public/simulacao.html`) foi regenerado com essas mudanças e agora inclui colegas com câmera vertical.
+
+## Salas com no mínimo 3 alunos e sem repetir parceiros (03/11)
+
+- **Tamanho:** cada sala tem de 3 a 4 alunos do mesmo nível. Exceções: nível com exatamente 5 alunos fica numa sala só (5); nível com 1 ou 2 alunos não forma sala própria e esses alunos entram nas menores salas dos outros níveis (se só existir esse nível, ficam juntos). Se o professor escolher o número de salas à mão, vale o número que ele pediu.
+- **Rodada 2 sem repetir:** a montagem agora é uma busca exata (com volta atrás) em vez de sorteio com trocas, então encontra a solução sempre que ela existir. Na rodada 1 o sistema já escolhe o número de salas que deixa a rodada 2 possível sem repetição. Com 3 a 4 por sala isso é possível a partir de 9 alunos por nível, exceto com 10 ou 11 alunos (aí o mínimo de repetições é feito).
+- **Quem volta depois de cair** (ou entra depois do início) agora vai para a sala onde não conhece ninguém, e só depois se considera o tamanho da sala. Antes ia para a menor sala, o que podia repetir parceiro mesmo havendo opção melhor.
+- Testes novos em `test/grouping.test.js`.
+
+## Botões de câmera/microfone e câmera no simulador (03/11)
+
+- **Botões da sala de espera:** estavam com a lógica invertida (ligado ficava vermelho). Agora seguem o mesmo padrão da sala de conversação: desligado = vermelho com a chave à esquerda; ligado = cor normal com a chave à direita.
+- **Simulador:** passa a usar a câmera e o microfone escolhidos no teste (antes abria o aparelho padrão, que podia ser uma câmera virtual). Trocar de câmera ou microfone dentro da sala atualiza a imagem na hora, inclusive com o desfoque ligado.

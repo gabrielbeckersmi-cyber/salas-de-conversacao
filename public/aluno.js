@@ -97,6 +97,7 @@
   window.addEventListener('pagehide', function (ev) { if (!ev.persisted && conn) sendLeave(); });
 
   function leaveClass() {
+    cancelIntro();
     if (conn) { conn.close(); conn = null; }
     sendLeave();
     resetTutorial();
@@ -688,6 +689,43 @@
   $('l-screen-fs').addEventListener('click', function () { setExpanded(!$('l-screen').classList.contains('expanded')); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setExpanded(false); });
 
+  // ---------- contagem antes de entrar na sala de conversação ----------
+  var intro = null;          // { key, el, timer }
+  var introDoneKey = '';
+  function introKeyOf(sn) { return sn.phase + ':' + sn.room.id; }
+  function introDone(sn) { return introDoneKey === introKeyOf(sn); }
+  // só na largada da rodada (quem recarrega a página no meio da rodada entra direto)
+  function introWanted(sn) {
+    if (!sn.endsAt || !sn.roundMinutes) return true;
+    var startedAt = sn.endsAt - sn.roundMinutes * 60000;
+    return Date.now() + offset - startedAt < 20000;
+  }
+  function cancelIntro() {
+    if (!intro) return;
+    clearInterval(intro.timer);
+    if (intro.el.parentNode) intro.el.parentNode.removeChild(intro.el);
+    intro = null;
+  }
+  function startIntro(sn) {
+    var key = introKeyOf(sn);
+    if (intro && intro.key === key) return;
+    cancelIntro();
+    var el = document.createElement('div');
+    el.className = 'intro';
+    el.setAttribute('role', 'alert');
+    var n = 3;
+    function paint() { el.innerHTML = '<p>Sua sala de conversação vai iniciar em…</p><b>' + n + '</b>'; }
+    paint();
+    document.body.appendChild(el);
+    intro = { key: key, el: el, timer: setInterval(function () {
+      n -= 1;
+      if (n > 0) { paint(); return; }
+      introDoneKey = key;
+      cancelIntro();
+      if (snap) render();
+    }, 1000) };
+  }
+
   function render() {
     $('title').textContent = snap.title;
     var isLs = !!(snap.me && snap.me.listener);
@@ -698,12 +736,15 @@
     $('l-ls').hidden = !isLs;
     var running = snap.phase === 'r1' || snap.phase === 'r2';
     if (snap.phase === 'done') {
+      cancelIntro();
       leaveLive(); leaveLobby(); stopCheck(); window.Jogo.stop();
       closeTutorial();
       screenEnd(snap.endMessage);
       return;
     }
-    if (running && snap.room) {
+    if (running && snap.room && !live && !introDone(snap) && introWanted(snap)) startIntro(snap);
+    if (!(running && snap.room)) cancelIntro();
+    if (running && snap.room && !intro) {
       stopCheck(); window.Jogo.stop(); leaveLobby();
       resetTutorial(); closeTutorial();
       showOnly('live');
@@ -955,6 +996,11 @@
   }
   function setStatus(text) { $('l-status').textContent = text || ''; }
 
+  function fitLiveTiles() {
+    var desk = window.matchMedia && window.matchMedia('(min-width: 900px) and (min-height: 560px)').matches && document.body.classList.contains('in-live');
+    layoutTiles(tilesEl, desk, 560);
+  }
+  watchTiles(tilesEl, fitLiveTiles);
   function makeTile(pid, name, isMe) {
     var el = document.createElement('div');
     el.className = 'tile ' + A.LEVEL_CLS[snap.me.level] + (isMe ? ' me' : '');
@@ -1405,41 +1451,56 @@
   var lobbyAudio = $('lobby-audio');
 
   function lobbyWarn(text) { var w = $('lb-warn'); w.hidden = !text; w.textContent = text || ''; }
-  // os quadradinhos mudam de tamanho para caber todo mundo no mesmo espaço, sem barra de rolagem
-  function fitLobbyTiles() {
-    var el = lobbyTilesEl, n = el.children.length;
-    if (!n || !el.clientWidth || !el.clientHeight) return;
-    var W = el.clientWidth, H = el.clientHeight, gap = 8, best = 0, bc = 1;
-    for (var c = 1; c <= n; c++) {
-      var rows = Math.ceil(n / c);
-      var w = (W - gap * (c - 1)) / c;
-      var h = w * 3 / 4;
-      if (h * rows + gap * (rows - 1) > H) { h = (H - gap * (rows - 1)) / rows; w = h * 4 / 3; }
-      if (w > best) { best = w; bc = c; }
+  // Todas as câmeras têm a MESMA ALTURA e a largura segue a proporção de cada câmera (horizontal fica mais larga, vertical mais estreita):
+  // o vídeo aparece inteiro, sem faixas pretas. A altura é a maior possível para todos caberem no espaço, sem barra de rolagem.
+  function layoutTiles(el, fixedHeight, maxH) {
+    var gap = 8, W = el.clientWidth;
+    if (!W) return;
+    var info = [];
+    Array.prototype.forEach.call(el.children, function (k, i) {
+      if (!k.classList || !k.classList.contains('tile')) return;
+      var v = k.querySelector('video'), ar = 4 / 3;
+      if (v && v.videoWidth && v.videoHeight && k.classList.contains('has-video') && !k.classList.contains('video-off')) ar = v.videoWidth / v.videoHeight;
+      info.push({ k: k, ar: Math.max(0.4, Math.min(2.4, ar)), o: Number(getComputedStyle(k).order) || 0, i: i });
+    });
+    if (!info.length) return;
+    info.sort(function (a, b) { return a.o - b.o || a.i - b.i; });
+    var h;
+    if (fixedHeight) {
+      var H = el.clientHeight;
+      if (!H) return;
+      var fits = function (hh) {
+        var rows = 1, x = 0;
+        info.forEach(function (t) {
+          var w = Math.min(hh * t.ar, W);
+          if (x > 0 && x + gap + w > W) { rows++; x = 0; }
+          x += (x > 0 ? gap : 0) + w;
+        });
+        return rows * hh + gap * (rows - 1) <= H;
+      };
+      var lo = 24, hi = Math.min(maxH, H);
+      if (fits(hi)) h = hi;
+      else { for (var n = 0; n < 16; n++) { var mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; } h = lo; }
+    } else {
+      h = Math.min(maxH, Math.max(70, (W - gap) / 2 * 3 / 4));   // celular com rolagem: cerca de duas câmeras horizontais por linha
     }
-    // computador (sala de espera): as câmeras esticam e preenchem todo o lado esquerdo, sem sobrar faixas vazias
-    if (window.matchMedia && window.matchMedia('(min-width: 900px) and (min-height: 560px)').matches && document.body.classList.contains('in-wait')) {
-      var fb = null;
-      for (var c2 = 1; c2 <= n; c2++) {
-        var r2 = Math.ceil(n / c2);
-        var cw = (W - gap * (c2 - 1)) / c2, ch = (H - gap * (r2 - 1)) / r2;
-        var score = Math.abs(Math.log((cw / ch) / (4 / 3)));
-        if (!fb || score < fb.score) fb = { c: c2, r: r2, w: cw, h: ch, score: score };
-      }
-      if (fb && fb.w <= 520 && fb.h <= 400) {
-        el.style.gridTemplateColumns = 'repeat(' + fb.c + ', minmax(0, 1fr))';
-        el.style.gridTemplateRows = 'repeat(' + fb.r + ', minmax(0, 1fr))';
-        el.style.gridAutoRows = '';
-        return;
-      }
-    }
-    el.style.gridTemplateRows = '';
-    best = Math.max(40, Math.min(best, 520));
-    el.style.gridTemplateColumns = 'repeat(' + bc + ', ' + Math.floor(best) + 'px)';
-    el.style.gridAutoRows = Math.floor(best * 3 / 4) + 'px';
+    info.forEach(function (t) {
+      t.k.style.height = Math.floor(h) + 'px';
+      t.k.style.width = Math.floor(Math.min(W, h * t.ar)) + 'px';
+    });
   }
-  if (window.ResizeObserver) new ResizeObserver(fitLobbyTiles).observe(lobbyTilesEl);
-  window.addEventListener('resize', fitLobbyTiles);
+  function watchTiles(el, fn) {
+    var raf = 0;
+    var again = function () { if (raf) return; raf = requestAnimationFrame(function () { raf = 0; fn(); }); };
+    if (window.ResizeObserver) new ResizeObserver(again).observe(el);
+    if (window.MutationObserver) new MutationObserver(again).observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    el.addEventListener('loadedmetadata', again, true);   // a proporção real da câmera só se sabe depois que o vídeo carrega
+    el.addEventListener('resize', again, true);
+    window.addEventListener('resize', again);
+    return again;
+  }
+  function fitLobbyTiles() { layoutTiles(lobbyTilesEl, true, 560); }
+  watchTiles(lobbyTilesEl, fitLobbyTiles);
   function lobbyCount() { $('lobby-count').textContent = lTiles.size ? '· ' + lTiles.size + (lTiles.size === 1 ? ' pessoa' : ' pessoas') : ''; fitLobbyTiles(); }
   function lobbyTile(id, name) {
     var t = lTiles.get(id);
@@ -1492,11 +1553,12 @@
     mic.innerHTML = (micOn ? A.ICON.mic : A.ICON.micoff) + 'Microfone' + sw(micOn);
     mic.setAttribute('aria-label', micOn ? 'Microfone ligado. Toque para desligar' : 'Microfone desligado. Toque para ligar');
     cam.setAttribute('aria-label', camOn ? 'Câmera ligada. Toque para desligar' : 'Câmera desligada. Toque para ligar');
-    mic.className = 'btn' + (micOn ? ' btn-live' : '');
-    mic.setAttribute('aria-pressed', String(micOn));
+    // mesmo padrão da sala de conversação: desligado = vermelho (pressionado) com a chave à esquerda; ligado = cor normal com a chave à direita
+    mic.className = 'btn btn-live';
+    mic.setAttribute('aria-pressed', String(!micOn));
     cam.innerHTML = A.ICON.cam + 'Câmera' + sw(camOn);
-    cam.className = 'btn' + (camOn ? ' btn-live' : '');
-    cam.setAttribute('aria-pressed', String(camOn));
+    cam.className = 'btn btn-live';
+    cam.setAttribute('aria-pressed', String(!camOn));
     mic.disabled = cam.disabled = !lobby;
   }
   function bindLobby(room, seq) {
