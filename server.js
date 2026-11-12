@@ -250,7 +250,7 @@ function build(env) {
   // --- aluno ---
   app.get('/api/classes/:id/public', function (req, res) {
     const c = getClass(req.params.id);
-    res.json({ title: c.title, phase: c.phase, allowLate: !!c.allowLate, endMessage: c.phase === 'done' ? (c.endMessage || null) : null });
+    res.json({ title: c.title, phase: c.phase, allowLate: !!c.allowLate, closed: C.isClosed(c), endMessage: c.phase === 'done' ? (c.endMessage || null) : null });
   });
 
   app.post('/api/classes/:id/join', function (req, res) {
@@ -317,10 +317,10 @@ function build(env) {
   function dynCopy(c, room) {
     return Object.assign({}, room, { members: room.members.filter(function (p) { const x = C.byPid(c, p); return x && !x.listener; }) });
   }
-  function dynRoom(c, studentId) {
+  function dynRoom(c, studentId, readOnly) {
     const s = c.students[String(studentId)];
     if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.');
-    if (s.listener) throw new C.AppError(403, 'listener', 'Como ouvinte você não consegue interagir.');
+    if (s.listener && !readOnly) throw new C.AppError(403, 'listener', 'Como ouvinte você só pode olhar as atividades.');
     const room = C.isLive(c) ? C.roomOf(c, s.pid) : null;
     return { s: s, room: room ? dynCopy(c, room) : null };
   }
@@ -333,12 +333,19 @@ function build(env) {
       const set = st && r.students.get(st.id);
       if (set) set.forEach(function (ws) { send(ws, { type: 'dyn', roomId: room.id, data: D.view(c, room, pid, now) }); });
     });
+    // ouvintes da sala só olham (sem segredos de ninguém sorteados por eles)
+    room0.members.forEach(function (pid) {
+      const st = C.byPid(c, pid);
+      if (!st || !st.listener) return;
+      const set = r.students.get(st.id);
+      if (set) set.forEach(function (ws) { send(ws, { type: 'dyn', roomId: room.id, data: D.view(c, room, null, now) }); });
+    });
     save();
   }
   app.get('/api/classes/:id/dyn', function (req, res) {
     const c = getClass(req.params.id);
-    const x = dynRoom(c, req.query.studentId);
-    res.json({ roomId: x.room ? x.room.id : null, data: x.room ? D.view(c, x.room, x.s.pid, Date.now()) : null });
+    const x = dynRoom(c, req.query.studentId, true);
+    res.json({ roomId: x.room ? x.room.id : null, data: x.room ? D.view(c, x.room, x.s.listener ? null : x.s.pid, Date.now()) : null });
   });
   app.post('/api/classes/:id/dyn', function (req, res) {
     const c = getClass(req.params.id);
@@ -466,6 +473,16 @@ function build(env) {
     const s = c.students[String(req.body.studentId)];
     if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.');
     C.setCall(c, s, !!req.body.on);
+    schedule(c);
+    res.json({ ok: true });
+  });
+
+  // ouvinte troca de sala quando quiser (inclusive salas do intermediário)
+  app.post('/api/classes/:id/room', function (req, res) {
+    const c = getClass(req.params.id);
+    const s = c.students[String(req.body.studentId)];
+    if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.');
+    C.moveListener(c, s, String(req.body.roomId || ''));
     schedule(c);
     res.json({ ok: true });
   });

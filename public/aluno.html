@@ -132,11 +132,18 @@
   @keyframes okdraw { to { stroke-dashoffset: 0; } }
   .lv-ouv { --lvl: #8a5300; --lvl-bg: #fff1cf; }
   .ls-note { background: #fff1cf; color: #6b4200; border: 2px solid #f2b53d; font-weight: 800; }
-  body.listener #game, body.listener .check, body.listener #themes, body.listener .lobby .controls, body.listener .lobby-chat,
-  body.listener #live .controls, body.listener #live .devs, body.listener #l-call, body.listener #l-chat-form,
-  body.listener #tab-tr, body.listener #tab-dyn, body.listener #pane-tr, body.listener #pane-dyn { display: none !important; }
+  body.listener #game, body.listener .check, body.listener .lobby .controls, body.listener #live .devs { display: none !important; }
+  /* ouvinte vê a sala inteira, mas os botões ficam travados */
+  body.listener #live .controls .btn, body.listener #l-call, body.listener #pane-dyn [data-dyn], body.listener #pane-tr [data-tr="send"] { opacity: .45; pointer-events: none; filter: grayscale(.4); }
+  .ls-rooms { display: none; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+  body.listener .ls-rooms { display: flex; }
+  .ls-rooms label { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); }
+  .ls-rooms select { width: 100%; padding: 10px; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-weight: 700; }
+  .theme-pane h3 { margin: 0 0 8px; font-size: 16px; }
+  .theme-pane ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-weight: 700; font-size: 17px; }
   @media (min-width: 900px) and (min-height: 560px) { body.listener.in-wait #waiting .card { grid-template-columns: minmax(0, 1fr); } }
   .join .seg.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .join .seg.one { grid-template-columns: minmax(0, 1fr); }
   .join .seg.three span { padding: 10px 2px; font-size: 13px; }
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
   .tab { font: inherit; font-weight: 600; font-size: 14px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer; min-height: 36px; }
@@ -387,6 +394,7 @@
         </div>
         <div class="live-side">
           <button class="btn btn-sm" id="l-sound" type="button" hidden>Ativar o som da sala</button>
+          <div class="ls-rooms" id="l-rooms"><label for="l-rooms-sel">Trocar de sala (ouvinte)</label><select id="l-rooms-sel"></select></div>
           <button class="btn btn-call call-big" id="l-call" type="button"></button>
           <section class="chat" id="l-chat" aria-label="Chat da sala">
             <div class="chat-head">
@@ -394,6 +402,7 @@
                 <button class="tab on" id="tab-chat" role="tab" aria-selected="true" aria-controls="pane-chat" type="button">Chat da sala</button>
                 <button class="tab tab-tr nudge" id="tab-tr" role="tab" aria-selected="false" aria-controls="pane-tr" type="button">Tradutor</button>
                 <button class="tab tab-dyn nudge" id="tab-dyn" role="tab" aria-selected="false" aria-controls="pane-dyn" type="button">Atividades</button>
+                <button class="tab" id="tab-theme" role="tab" aria-selected="false" aria-controls="pane-theme" type="button">Tema</button>
               </div>
             </div>
             <div class="chat-body" id="l-chat-body">
@@ -425,6 +434,11 @@
                     <button class="btn btn-sm" data-tr="say" data-box="out" type="button">Ouvir</button>
                   </div>
                 </div>
+              </div>
+              <div class="pane theme-pane" id="pane-theme" role="tabpanel" hidden>
+                <h3>Tema sugerido da aula</h3>
+                <ul id="theme-live-list"></ul>
+                <p class="none" id="theme-live-none" hidden>O professor ainda não definiu um tema para hoje.</p>
               </div>
               <div class="pane" id="pane-dyn" role="tabpanel" hidden>
                 <div class="subtabs"><button class="btn btn-sm sub on" data-sub="din" type="button">Dinâmicas</button><button class="btn btn-sm sub" data-sub="per" type="button">Perguntas</button></div>

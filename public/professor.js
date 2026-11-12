@@ -175,7 +175,67 @@
     });
   }
 
+  // ---------- alarme sonoro de chamado (alto, repete até o professor atender) ----------
+  var alarm = { ctx: null, on: true, seen: {}, timer: 0 };
+  try { alarm.on = localStorage.getItem('salas:alarm') !== '0'; } catch (e) { /* ignorar */ }
+  function alarmCtx() {
+    if (!alarm.ctx) { var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; try { alarm.ctx = new AC(); } catch (e) { return null; } }
+    if (alarm.ctx.state === 'suspended') { try { alarm.ctx.resume(); } catch (e) { /* ignorar */ } }
+    return alarm.ctx;
+  }
+  function beepAlarm() {
+    var ctx = alarmCtx();
+    if (!ctx || !alarm.on) return;
+    var comp = ctx.createDynamicsCompressor();
+    var master = ctx.createGain();
+    master.gain.value = 1;                       // volume máximo do navegador (o resto é o volume do computador)
+    comp.connect(master); master.connect(ctx.destination);
+    var t0 = ctx.currentTime + 0.02;
+    for (var i = 0; i < 6; i++) {                // sirene: 6 toques alternando agudo e muito agudo
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.type = 'square';
+      o.frequency.value = i % 2 ? 1320 : 990;
+      var a = t0 + i * 0.22;
+      g.gain.setValueAtTime(0.0001, a);
+      g.gain.exponentialRampToValueAtTime(0.9, a + 0.01);
+      g.gain.setValueAtTime(0.9, a + 0.16);
+      g.gain.exponentialRampToValueAtTime(0.0001, a + 0.2);
+      o.connect(g); g.connect(comp);
+      o.start(a); o.stop(a + 0.21);
+    }
+  }
+  function alarmCheck() {
+    var pend = {};
+    var n = 0, fresh = false;
+    S.students.forEach(function (st) {
+      if (st.callAt && !st.listener && isLive()) { pend[st.pid] = st.callAt; n++; if (alarm.seen[st.pid] !== st.callAt) fresh = true; }
+    });
+    alarm.seen = pend;
+    if (fresh) beepAlarm();
+    clearInterval(alarm.timer);
+    alarm.timer = n ? setInterval(beepAlarm, 7000) : 0;   // continua tocando de 7 em 7 segundos até atender
+  }
+  function alarmButton() {
+    if (document.getElementById('alarm-btn')) return;
+    var b = document.createElement('button');
+    b.id = 'alarm-btn'; b.type = 'button'; b.className = 'btn btn-sm';
+    b.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+    var paint = function () { b.textContent = alarm.on ? '🔔 Som de chamado: ligado' : '🔕 Som de chamado: desligado'; b.setAttribute('aria-pressed', String(!alarm.on)); };
+    b.addEventListener('click', function () {
+      alarm.on = !alarm.on;
+      try { localStorage.setItem('salas:alarm', alarm.on ? '1' : '0'); } catch (e) { /* ignorar */ }
+      paint();
+      if (alarm.on) beepAlarm();                 // toque de teste ao ligar
+    });
+    paint();
+    document.body.appendChild(b);
+  }
+  ['pointerdown', 'keydown'].forEach(function (ev) { document.addEventListener(ev, function () { if (alarm.ctx) alarmCtx(); else if (S) alarmCtx(); }, { passive: true }); });
+
   function onState() {
+    alarmButton();
+    alarmCheck();
     if (S.round !== ui.round) {                     // nova rodada: salas novas, chat novo
       var lobbyChat = ui.chat.lobby; var lobbyUnread = ui.unread.lobby;
       ui.round = S.round; ui.chat = {}; ui.unread = {}; ui.sel.clear(); ui.fetched = -1;

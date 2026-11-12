@@ -7,6 +7,7 @@ test('entrada tardia: aluno que chega com a aula em andamento vai para sala do n
   const c = C.createClass(store, { title: 't', roundMinutes: 5 });
   for (let i = 0; i < 12; i++) C.joinStudent(c, { name: 'Aluno ' + i, level: 'basico' }).online = true;
   C.startRound(c);
+  c.allowLate = true; // sem liberação do professor, só ouvintes entram depois do início
   c.rooms.forEach((r) => { while (r.members.length < 4) { const x = C.joinStudent(c, { name: 'Extra ' + Math.random().toString(36).slice(2, 6), level: 'basico' }); x.online = true; r.members.push(x.pid); } });
   const s = C.joinStudent(c, { name: 'Atrasado', level: 'basico' });
   assert.strictEqual(s.late, true);

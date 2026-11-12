@@ -66,6 +66,7 @@
   function pushDyn(room0) {
     var room = dynCopy(room0), now = Date.now();
     room.members.forEach(function (pid) { var st = C.byPid(c, pid); if (st) wsOf(st).forEach(function (w) { w._msg({ type: 'dyn', roomId: room.id, data: D.view(c, room, pid, now) }); }); });
+    room0.members.forEach(function (pid) { var st = C.byPid(c, pid); if (st && st.listener) wsOf(st).forEach(function (w) { w._msg({ type: 'dyn', roomId: room.id, data: D.view(c, room, null, now) }); }); });
   }
 
   // ---------- "servidor" que as telas chamam ----------
@@ -75,7 +76,7 @@
     try {
       var s = c.students[String(b.studentId || q.studentId || '')];
       var need = function () { if (!s) throw new C.AppError(404, 'student', 'Aluno não encontrado.'); return s; };
-      if (path === '/public') return { status: 200, json: { title: c.title, phase: c.phase, allowLate: !!c.allowLate, endMessage: c.phase === 'done' ? (c.endMessage || null) : null } };
+      if (path === '/public') return { status: 200, json: { title: c.title, phase: c.phase, allowLate: !!c.allowLate, closed: C.isClosed(c), endMessage: c.phase === 'done' ? (c.endMessage || null) : null } };
       if (path === '/join') {
         var st = C.joinStudent(c, { name: b.name, level: b.level, resumeId: b.resumeId });
         st.slot = slot; schedule();
@@ -88,15 +89,16 @@
         return { status: 200, json: { roomId: room ? room.id : null, messages: room ? C.chatHistory(c, room.id) : [], lobby: C.chatHistory(c, 'lobby') } };
       }
       if (path === '/dyn') {
-        need(); if (s.listener) throw new C.AppError(403, 'listener', 'Como ouvinte você não consegue interagir.');
+        need(); if (s.listener && method === 'POST') throw new C.AppError(403, 'listener', 'Como ouvinte você só pode olhar as atividades.');
         var rm = C.isLive(c) ? C.roomOf(c, s.pid) : null;
         if (method === 'POST') {
           if (!rm) throw new C.AppError(409, 'no-room', 'Você ainda não está em uma sala.');
           D.act(c, dynCopy(rm), String(b.action || ''), Date.now(), undefined); pushDyn(rm); return { status: 200, json: { ok: true } };
         }
-        return { status: 200, json: { roomId: rm ? rm.id : null, data: rm ? D.view(c, dynCopy(rm), s.pid, Date.now()) : null } };
+        return { status: 200, json: { roomId: rm ? rm.id : null, data: rm ? D.view(c, dynCopy(rm), s.listener ? null : s.pid, Date.now()) : null } };
       }
       if (path === '/score') { var best = C.submitScore(c, need(), b.score); schedule(); return { status: 200, json: { best: best } }; }
+      if (path === '/room') { C.moveListener(c, need(), String(b.roomId || '')); schedule(); return { status: 200, json: { ok: true } }; }
       if (path === '/call') { C.setCall(c, need(), !!b.on); schedule(); return { status: 200, json: { ok: true } }; }
       if (path === '/leave') {
         if (s) { wsOf(s).forEach(function (w) { w.close(4005); }); C.setOnline(c, s.id, false); schedule(); }

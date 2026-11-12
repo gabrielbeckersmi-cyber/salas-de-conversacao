@@ -162,11 +162,17 @@
         try { localStorage.setItem(KEY, JSON.stringify(session)); localStorage.setItem('salas:level', r.level); } catch (e2) { /* ignorar */ }
         return uploadPhoto().then(function () { openSession(); });
       })
-      .catch(function (ex) { screenJoin(ex.message, { name: name, level: level === 'ouvinte' ? 'ouvinte' : level }); });
+      .catch(function (ex) {
+        // a aula pode ter começado enquanto a pessoa preenchia: atualiza para mostrar só a entrada de ouvinte
+        fetch('/api/classes/' + encodeURIComponent(classId) + '/public').then(function (r) { return r.json(); }).then(function (info) { if (info && info.title) publicInfo = info; }, function () { /* ignorar */ })
+          .then(function () { screenJoin(ex.message, { name: name, level: level === 'ouvinte' ? 'ouvinte' : level }); });
+      });
   }
 
   function screenJoin(note, pre) {
     var okListener = false;
+    var closed = !!(publicInfo && publicInfo.closed);
+    if (closed) pre = { name: pre && pre.name || '', level: 'ouvinte' };
     say('<form class="card join" id="join-form" novalidate>' +
       '<div class="photo-pick"><button type="button" class="photo-circle" id="j-photo" aria-label="Adicionar foto"></button>' +
       '<div class="photo-act"><button type="button" class="linkbtn" id="j-photo-txt">Adicionar foto</button><button type="button" class="linkbtn dim" id="j-photo-del" hidden>Remover</button></div>' +
@@ -174,8 +180,9 @@
       '<h1>' + A.esc(publicInfo ? publicInfo.title : 'Aula de conversação') + '</h1>' +
       (note ? '<div class="msg err" role="alert">' + A.esc(note) + '</div>' : '') +
       '<div class="field"><label class="lbl" for="j-name">Seu nome</label><input class="input" id="j-name" maxlength="30" autocomplete="name" placeholder="Ex.: Marcos P." required></div>' +
-      '<div class="field"><span class="lbl-t">Seu nível</span><fieldset class="seg three" aria-label="Seu nível">' +
-      [['basico', 'Básico', A.LEVEL_CLS.basico], ['intermediario', 'Intermediário', A.LEVEL_CLS.intermediario], ['ouvinte', 'Ouvinte', 'lv-ouv']].map(function (l) {
+      (closed ? '<div class="banner ls-note" role="status">A aula já iniciou. Agora só é possível entrar como ouvinte: você vê a sala e as atividades, e é colocado em uma sala automaticamente.</div>' : '') +
+      '<div class="field"><span class="lbl-t">Seu nível</span><fieldset class="seg ' + (closed ? 'one' : 'three') + '" aria-label="Seu nível">' +
+      [['basico', 'Básico', A.LEVEL_CLS.basico], ['intermediario', 'Intermediário', A.LEVEL_CLS.intermediario], ['ouvinte', 'Ouvinte', 'lv-ouv']].filter(function (l) { return !closed || l[0] === 'ouvinte'; }).map(function (l) {
         return '<label class="' + l[2] + '"><input type="radio" name="level" value="' + l[0] + '"><span>' + l[1] + '</span></label>';
       }).join('') + '</fieldset></div>' +
       '<div class="msg err" id="j-err" role="alert" hidden></div>' +
@@ -588,7 +595,7 @@
   }
   function paintChatToggle() {
     $('l-chat').classList.toggle('chat-new', chatUnread > 0 && chatTab !== 'chat');
-    ['chat', 'tr', 'dyn'].forEach(function (t) {
+    ['chat', 'tr', 'dyn', 'theme'].forEach(function (t) {
       $('tab-' + t).classList.toggle('on', chatTab === t);
       $('tab-' + t).setAttribute('aria-selected', String(chatTab === t));
       $('pane-' + t).hidden = chatTab !== t;
@@ -598,13 +605,14 @@
   }
   function setTab(t) {
     chatTab = t;
-    if (t === 'chat') chatUnread = 0; else if (t === 'tr') trSeen = true; else dynSeen = true;
+    if (t === 'chat') chatUnread = 0; else if (t === 'tr') trSeen = true; else if (t === 'dyn') dynSeen = true;
     paintChatToggle();
     if (t === 'chat') chatListEl.scrollTop = chatListEl.scrollHeight;
   }
   $('tab-chat').addEventListener('click', function () { setTab('chat'); });
   $('tab-tr').addEventListener('click', function () { setTab('tr'); });
   $('tab-dyn').addEventListener('click', function () { setTab('dyn'); });
+  $('tab-theme').addEventListener('click', function () { setTab('theme'); });
   function addChat(m) {
     if (chat.ids.has(m.id)) return;
     chat.ids.add(m.id);
@@ -637,7 +645,7 @@
     e.preventDefault();
     var inp = $('l-chat-in');
     var text = inp.value.trim();
-    if (!text || !session) return;
+    if (!text || !session || (snap && snap.me && snap.me.listener)) return;
     inp.value = '';
     A.api('POST', '/api/classes/' + encodeURIComponent(classId) + '/chat', { studentId: session.studentId, text: text }).catch(function (ex) {
       inp.value = text;
@@ -732,8 +740,11 @@
     document.body.classList.toggle('listener', isLs);
     var wls = $('w-ls');
     wls.hidden = !isLs;
-    wls.textContent = snap.phase === 'closing' ? 'Você está como ouvinte na sala de espera, ninguém te vê ou te ouve.' : 'Você está como ouvinte na sala de espera, ninguém te vê ou te ouve, a aula já vai começar.';
+    wls.textContent = snap.phase === 'closing' ? 'Você está como ouvinte na sala de espera. Dá para conversar no chat, mas ninguém te vê ou te ouve.'
+      : (snap.phase === 'r1' || snap.phase === 'r2') ? 'A aula já iniciou. Você está como ouvinte e já vai ser colocado em uma sala.'
+      : 'Você está como ouvinte na sala de espera. Dá para conversar no chat, mas ninguém te vê ou te ouve.';
     $('l-ls').hidden = !isLs;
+    $('l-ls').textContent = 'A aula já iniciou e você está como ouvinte: dá para ver tudo e trocar de sala, mas não é possível interagir.';
     var running = snap.phase === 'r1' || snap.phase === 'r2';
     if (snap.phase === 'done') {
       cancelIntro();
@@ -812,6 +823,8 @@
       themeItems = items;
       $('themes').hidden = !items.length || !!(snap && snap.phase === 'closing');
       $('themes-list').innerHTML = items.map(function (x) { return '<li>' + A.esc(x) + '</li>'; }).join('');
+      $('theme-live-list').innerHTML = items.map(function (x) { return '<li>' + A.esc(x) + '</li>'; }).join('');
+      $('theme-live-none').hidden = !!items.length;
     }).catch(function () { /* ignorar */ });
   }
   loadThemes();
@@ -1388,13 +1401,48 @@
     }
     var call = $('l-call');
     call.innerHTML = A.ICON.bell + (r.calling ? 'Cancelar chamado' : 'Chamar professor');
-    call.disabled = false;
+    var ls = !!(snap.me && snap.me.listener);
+    call.disabled = ls;
     call.classList.toggle('calling', !!r.calling);
+    $('l-chat-in').disabled = ls;
+    $('l-chat-form').querySelector('button').disabled = ls;
+    $('l-chat-in').placeholder = ls ? 'Ouvintes só acompanham o chat' : 'Escreva para a sala…';
+    if (ls) {
+      // botões só para visualização (ouvinte não liga câmera nem microfone)
+      if (!$('l-mic').innerHTML) { $('l-mic').innerHTML = A.ICON.micoff + 'Microfone' + sw(false); $('l-mic').className = 'btn btn-live'; $('l-mic').setAttribute('aria-pressed', 'true'); }
+      if (!$('l-cam').innerHTML) { $('l-cam').innerHTML = A.ICON.cam + 'Câmera' + sw(false); $('l-cam').className = 'btn btn-live'; $('l-cam').setAttribute('aria-pressed', 'true'); }
+      $('l-mic').disabled = true; $('l-cam').disabled = true;
+      paintRooms();
+    }
     syncTiles();
     syncChat();
     syncDyn();
     tickTimer();
   }
+
+  // ---------- ouvinte: trocar de sala ----------
+  var roomsSig = '';
+  function levelTxt(l) { return l === 'intermediario' ? 'Intermediário' : l === 'basico' ? 'Básico' : 'Misto'; }
+  function paintRooms() {
+    var list = snap.rooms || [];
+    var sel = $('l-rooms-sel');
+    var cur = snap.room ? snap.room.id : '';
+    var sig = cur + '|' + list.map(function (x) { return x.id + ':' + x.no + ':' + x.level + ':' + x.count; }).join(',');
+    if (sig === roomsSig) return;
+    roomsSig = sig;
+    sel.innerHTML = list.map(function (x) {
+      return '<option value="' + A.esc(x.id) + '"' + (x.id === cur ? ' selected' : '') + '>Sala ' + x.no + ' · ' + levelTxt(x.level) + ' · ' + x.count + (x.count === 1 ? ' pessoa' : ' pessoas') + '</option>';
+    }).join('');
+  }
+  $('l-rooms-sel').addEventListener('change', function () {
+    var id = this.value;
+    if (!session || !snap || !snap.room || id === snap.room.id) return;
+    A.api('POST', '/api/classes/' + encodeURIComponent(classId) + '/room', { studentId: session.studentId, roomId: id }).catch(function (ex) {
+      setWarn(ex.message, false);
+      setTimeout(function () { setWarn(null); }, 3000);
+      roomsSig = ''; paintRooms();
+    });
+  });
 
   function tickTimer() {
     if (!snap || !snap.endsAt) { A.urgent(null); return; }
@@ -1413,7 +1461,7 @@
 
   // ---------- botões ----------
   function setCall(on) {
-    if (!session || !snap || !snap.room) return;
+    if (!session || !snap || !snap.room || snap.me.listener) return;
     A.api('POST', '/api/classes/' + classId + '/call', { studentId: session.studentId, on: on })
       .then(function () { snap.room.calling = on; updateLive(); })
       .catch(function (e) { setWarn(e.message, false); });
@@ -1860,6 +1908,7 @@
     var text = (b.getAttribute('data-box') === 'in' ? $('tr-in').value : $('tr-out').textContent).trim();
     if (!text) return;
     if (b.getAttribute('data-tr') === 'say') { trSpeak(text); return; }
+    if (snap && snap.me && snap.me.listener) return;   // ouvinte não escreve no chat da sala
     if (!session) return;
     var old = b.textContent;
     b.disabled = true;
@@ -1901,7 +1950,7 @@
     }, function () { /* ignorar */ });
   }
   function dynAct(action) {
-    if (!session || dynBusy) return;
+    if (!session || dynBusy || (snap && snap.me && snap.me.listener)) return;
     dynBusy = true;
     A.api('POST', '/api/classes/' + encodeURIComponent(classId) + '/dyn', { studentId: session.studentId, action: action }).then(function () { dynBusy = false; }, function (ex) {
       dynBusy = false;
@@ -1959,7 +2008,7 @@
       if (!d.impostor && !d.revelado) h += '<p class="small">Cada um fala uma frase em inglês que ajude a entender a palavra, sem dizê-la.</p>';
     } else if (d.tipo === 'mimica') {
       hasEn = true;
-      h += '<div class="box"><span class="lbl">Sua palavra (só você vê)</span><span class="big">' + A.esc(d.palavra.en) + '</span>' + ptLine(d.palavra, show) + '</div>';
+      h += '<div class="box"><span class="lbl">' + (snap.me.listener ? 'Palavra do primeiro jogador' : 'Sua palavra (só você vê)') + '</span><span class="big">' + A.esc(d.palavra.en) + '</span>' + ptLine(d.palavra, show) + '</div>';
       h += '<div class="dtimer" id="dyn-timer" role="timer"></div><button class="btn btn-primary" id="dyn-mim" data-dyn="mimica" type="button">Começar ' + d.segundos + ' segundos</button>';
     } else if (d.tipo === 'quemsou') {
       hasEn = true;

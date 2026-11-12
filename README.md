@@ -176,3 +176,11 @@ Para regenerar depois de mudar a tela do aluno: `ESBUILD=caminho/do/esbuild node
 
 - **Botões da sala de espera:** estavam com a lógica invertida (ligado ficava vermelho). Agora seguem o mesmo padrão da sala de conversação: desligado = vermelho com a chave à esquerda; ligado = cor normal com a chave à direita.
 - **Simulador:** passa a usar a câmera e o microfone escolhidos no teste (antes abria o aparelho padrão, que podia ser uma câmera virtual). Trocar de câmera ou microfone dentro da sala atualiza a imagem na hora, inclusive com o desfoque ligado.
+
+## Entrada só como ouvinte, ouvintes com visão completa, tema e alarme (12/11)
+- **Aula iniciada = entrada fechada**: depois que a 1ª rodada começa, só dá para entrar como **Ouvinte** (a tela de entrada avisa "A aula já iniciou. Agora só é possível entrar como ouvinte" e mostra só essa opção). O ouvinte já é colocado em uma sala. Quem já estava na aula e caiu volta normalmente. Para liberar novos alunos mesmo assim, a ação `allow-late` (`POST` do painel) continua existindo (no simulador: botão "Liberar entrada tardia").
+- **Sala de espera**: ouvintes podem escrever no chat da sala de espera (ninguém os vê nem ouve).
+- **Sala de conversação**: o ouvinte vê tudo (vídeos, abas Chat/Tradutor/Atividades/Tema, botões), mas os botões ficam travados: não troca dinâmica nem pergunta, não chama o professor, não escreve no chat. As atividades aparecem em modo espectador (o servidor não sorteia nada em nome dele).
+- **Troca de sala do ouvinte**: seletor "Trocar de sala (ouvinte)" com todas as salas (básico e intermediário, com nº de pessoas). Rota `POST /api/classes/:id/room`.
+- **Aba Tema** ao lado de Atividades, com os temas sugeridos da aula (Firebase).
+- **Professor**: sirene alta (Web Audio, volume máximo do navegador) quando um aluno chama; repete a cada 7 s até atender. Botão fixo no canto inferior esquerdo liga/desliga e faz um toque de teste. O navegador só libera som depois de um clique na página (o login já conta).

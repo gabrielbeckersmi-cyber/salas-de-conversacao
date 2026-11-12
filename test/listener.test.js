@@ -17,7 +17,7 @@ test('ouvinte: entra, é colocado numa sala, some para os alunos e não interage
   const sv = C.studentView(c, subs[0]);
   sv.room && assert.ok(!sv.room.members.some((m) => m.pid === ls.pid), 'alunos não veem o ouvinte');
   assert.strictEqual(C.studentView(c, ls).me.listener, true);
-  assert.throws(() => C.studentSay(c, ls, 'oi'), (e) => e.status === 403 || /ouvinte|listener/i.test(e.message));
+  assert.throws(() => C.studentSay(c, ls, 'oi'), (e) => e.status === 403, 'ouvinte não escreve no chat da sala');
   c.rooms.forEach((r) => assert.ok(r.members.filter((p) => !C.byPid(c, p).listener).length <= 4));
 });
 
@@ -36,4 +36,41 @@ test('relatório conta quantas vezes o professor foi chamado', () => {
   assert.strictEqual(r.calls.total, 3);
   assert.strictEqual(r.calls.answered, 1 + (room.members.includes(b.pid) ? 1 : 0) * 0);
   assert.strictEqual(r.students.find((s) => s.name === 'Ana').calls, 2);
+});
+
+test('aula iniciada: só ouvinte entra, é colocado numa sala, troca de sala e fala só na espera', () => {
+  const c = C.createClass({}, { title: 't', roundMinutes: 5 });
+  const subs = [];
+  for (let i = 0; i < 4; i++) subs.push(C.joinStudent(c, { name: 'B' + i, level: 'basico' }));
+  for (let i = 0; i < 4; i++) subs.push(C.joinStudent(c, { name: 'I' + i, level: 'intermediario' }));
+  subs.forEach((s) => { s.online = true; });
+  const pre = C.joinStudent(c, { name: 'Ouvinte antes', level: 'ouvinte' }); pre.online = true;
+  assert.strictEqual(C.isClosed(c), false);
+  assert.strictEqual(C.studentSay(c, pre, 'oi na espera').roomId, 'lobby', 'ouvinte conversa na sala de espera');
+  C.startRound(c);
+  assert.strictEqual(C.isClosed(c), true);
+  assert.throws(() => C.joinStudent(c, { name: 'Tarde', level: 'basico' }), (e) => e.status === 403 && e.code === 'closed' && /só é possível entrar como ouvinte/.test(e.message));
+  const ls = C.joinStudent(c, { name: 'Ouvinte tarde', level: 'ouvinte' }); ls.online = true;
+  const first = C.placeStudentLive(c, ls);
+  assert.strictEqual(C.roomOf(c, ls.pid).id, first.id);
+  const v = C.studentView(c, ls);
+  assert.ok(v.closed && v.rooms.length === c.rooms.length);
+  assert.ok(v.rooms.some((r) => r.level === 'intermediario'), 'lista salas do intermediário');
+  const inter = v.rooms.find((r) => r.level === 'intermediario');
+  C.moveListener(c, ls, inter.id);
+  assert.strictEqual(C.roomOf(c, ls.pid).id, inter.id);
+  assert.ok(!C.studentView(c, subs[4]).room.members.some((m) => m.pid === ls.pid), 'ninguém vê o ouvinte');
+  assert.throws(() => C.studentSay(c, ls, 'oi'), (e) => e.status === 403);
+  assert.throws(() => C.setCall(c, ls, true), (e) => e.status === 403);
+  assert.throws(() => C.moveListener(c, subs[0], inter.id), (e) => e.status === 403);
+  // quem já estava na aula e caiu volta normalmente
+  subs[0].online = false;
+  assert.strictEqual(C.joinStudent(c, { name: 'B0', level: 'basico' }).id, subs[0].id);
+  // dinâmica em modo espectador não cria segredo para o ouvinte
+  const D = require('../lib/dinamicas');
+  const room = c.rooms.find((r) => r.id === inter.id);
+  const rm = Object.assign({}, room, { members: room.members.filter((p) => !C.byPid(c, p).listener) });
+  D.act(c, rm, 'start', Date.now());
+  const dv = D.view(c, rm, null, Date.now());
+  assert.ok(dv.started);
 });
